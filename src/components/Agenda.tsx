@@ -3,7 +3,8 @@ import {
   CalendarDays, Plus, ChevronLeft, ChevronRight, Clock, Trash2,
   Check, X, Edit3, AlertTriangle, Calendar, Columns3, LayoutGrid, Ban
 } from 'lucide-react';
-import { getPacientes, getConsultas, salvarConsulta, deletarConsulta } from '../db';
+import { initGoogle, loginGoogle, getAccessToken, getEventos, criarEvento, atualizarEvento, deletarEvento } from '../googleCalendar';
+import { getPacientes } from '../db';
 import {
   format, addDays, subDays, parseISO, startOfWeek, endOfWeek,
   addWeeks, subWeeks, startOfMonth, endOfMonth, addMonths, subMonths,
@@ -44,16 +45,12 @@ function getBrazilianHolidays(year: number): Map<string, string> {
   return holidays;
 }
 
-function isHoliday(dateStr: string): string | null {
-  const year = parseInt(dateStr.substring(0, 4));
-  return getBrazilianHolidays(year).get(dateStr) || null;
-}
-
 function isDayBlocked(dateStr: string): { blocked: boolean; reason: string } {
   const day = getDay(parseISO(dateStr));
   if (day === 0) return { blocked: true, reason: 'Domingo' };
   if (day === 6) return { blocked: true, reason: 'Sábado' };
-  const holiday = isHoliday(dateStr);
+  const year = parseInt(dateStr.substring(0, 4));
+  const holiday = getBrazilianHolidays(year).get(dateStr);
   if (holiday) return { blocked: true, reason: holiday };
   return { blocked: false, reason: '' };
 }
@@ -65,6 +62,23 @@ const timeSlots = [
   '19:00', '19:30', '20:00'
 ];
 
+// Converte evento do Google Calendar para formato interno
+function googleEventToAppt(event: any) {
+  const start = event.start?.dateTime || event.start?.date;
+  const date = start ? format(new Date(start), 'yyyy-MM-dd') : '';
+  const hora = start && event.start?.dateTime ? format(new Date(start), 'HH:mm') : '00:00';
+  return {
+    id: event.id,
+    titulo: event.summary || '',
+    data: date,
+    hora,
+    descricao: event.description || '',
+    status: event.description?.includes('[cancelada]') ? 'cancelada'
+      : event.description?.includes('[concluida]') ? 'concluida' : 'agendada',
+    raw: event,
+  };
+}
+
 export default function Agenda() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [viewMode, setViewMode] = useState<ViewMode>('week');
@@ -72,24 +86,50 @@ export default function Agenda() {
   const [editingAppt, setEditingAppt] = useState<any | null>(null);
   const [formError, setFormError] = useState('');
   const [pacientes, setPacientes] = useState<any[]>([]);
-  const [consultas, setConsultas] = useState<any[]>([]);
+  const [eventos, setEventos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [googleLogado, setGoogleLogado] = useState(false);
+  const [loginLoading, setLoginLoading] = useState(false);
 
   const [formData, setFormData] = useState({
-    paciente_id: '', date: selectedDate, time: '09:00', value: '', notes: '',
+    paciente_id: '', date: selectedDate, time: '09:00', duracao: '50', descricao: '',
   });
 
-  useEffect(() => { carregarDados(); }, []);
+  useEffect(() => {
+    initGoogle().then(() => {
+      getPacientes().then(p => setPacientes(p || []));
+      setLoading(false);
+    });
+  }, []);
 
-  async function carregarDados() {
-    setLoading(true);
+  async function handleLoginGoogle() {
+    setLoginLoading(true);
     try {
-      const [p, c] = await Promise.all([getPacientes(), getConsultas()]);
-      setPacientes(p || []);
-      setConsultas(c || []);
-    } catch (err) { console.error(err); }
-    setLoading(false);
+      await loginGoogle();
+      setGoogleLogado(true);
+      await carregarEventos();
+    } catch (err) {
+      console.error(err);
+    }
+    setLoginLoading(false);
   }
+
+  async function carregarEventos() {
+    if (!getAccessToken()) return;
+    try {
+      const d = parseISO(selectedDate);
+      const inicio = format(startOfMonth(addMonths(d, -1)), 'yyyy-MM-dd');
+      const fim = format(endOfMonth(addMonths(d, 1)), 'yyyy-MM-dd');
+      const evs = await getEventos(inicio, fim);
+      setEventos(evs.map(googleEventToAppt));
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  useEffect(() => {
+    if (googleLogado) carregarEventos();
+  }, [selectedDate, googleLogado]);
 
   const isTimeInPast = (date: string, time: string) => {
     const now = new Date();
@@ -116,7 +156,7 @@ export default function Agenda() {
   };
 
   const resetForm = () => {
-    setFormData({ paciente_id: '', date: selectedDate, time: '09:00', value: '', notes: '' });
+    setFormData({ paciente_id: '', date: selectedDate, time: '09:00', duracao: '50', descricao: '' });
     setEditingAppt(null);
     setShowForm(false);
     setFormError('');
@@ -127,7 +167,7 @@ export default function Agenda() {
     if (isDayBlocked(target).blocked) target = getNextWorkingDay(target);
     const slots = getAvailableTimeSlots(target);
     const first = slots.find(s => !s.isPast);
-    setFormData({ paciente_id: '', date: target, time: first?.time || '09:00', value: '', notes: '' });
+    setFormData({ paciente_id: '', date: target, time: first?.time || '09:00', duracao: '50', descricao: '' });
     setEditingAppt(null);
     setFormError('');
     setShowForm(true);
@@ -139,28 +179,43 @@ export default function Agenda() {
     const blockInfo = isDayBlocked(formData.date);
     if (blockInfo.blocked) { setFormError(`Dia indisponível: ${blockInfo.reason}`); return; }
     if (!editingAppt && isTimeInPast(formData.date, formData.time)) { setFormError('Horário já passou!'); return; }
-    if (!formData.paciente_id) { setFormError('Selecione um paciente!'); return; }
+
+    const paciente = pacientes.find(p => p.id === formData.paciente_id);
+    const titulo = paciente ? `Consulta - ${paciente.nome}` : 'Consulta';
+
     try {
-      await salvarConsulta({
-        id: editingAppt?.id,
-        paciente_id: formData.paciente_id,
-        data: formData.date,
-        hora: formData.time,
-        valor: parseFloat(formData.value) || 0,
-        status: editingAppt?.status || 'agendada',
-      });
+      if (editingAppt) {
+        await atualizarEvento(editingAppt.id, {
+          titulo,
+          data: formData.date,
+          hora: formData.time,
+          duracao: parseInt(formData.duracao),
+          descricao: formData.descricao,
+        });
+      } else {
+        await criarEvento({
+          titulo,
+          data: formData.date,
+          hora: formData.time,
+          duracao: parseInt(formData.duracao),
+          descricao: formData.descricao,
+        });
+      }
       resetForm();
-      carregarDados();
-    } catch (err: any) { setFormError(err.message); }
+      carregarEventos();
+    } catch (err: any) {
+      setFormError(err.message);
+    }
   };
 
   const handleEdit = (appt: any) => {
+    const paciente = pacientes.find(p => appt.titulo.includes(p.nome));
     setFormData({
-      paciente_id: appt.paciente_id,
+      paciente_id: paciente?.id || '',
       date: appt.data,
       time: appt.hora,
-      value: appt.valor?.toString() || '',
-      notes: '',
+      duracao: '50',
+      descricao: appt.descricao,
     });
     setEditingAppt(appt);
     setFormError('');
@@ -169,18 +224,24 @@ export default function Agenda() {
 
   const handleDelete = async (id: string) => {
     if (confirm('Tem certeza?')) {
-      await deletarConsulta(id);
-      carregarDados();
+      await deletarEvento(id);
+      carregarEventos();
     }
   };
 
   const handleStatusChange = async (appt: any, status: string) => {
-    await salvarConsulta({ ...appt, data: appt.data, hora: appt.hora, status });
-    carregarDados();
+    await atualizarEvento(appt.id, {
+      titulo: appt.titulo,
+      data: appt.data,
+      hora: appt.hora,
+      duracao: 50,
+      descricao: `[${status}] ${appt.descricao}`,
+    });
+    carregarEventos();
   };
 
   const getAppointmentsForDay = (date: string) =>
-    consultas.filter(c => c.data === date).sort((a, b) => a.hora.localeCompare(b.hora));
+    eventos.filter(e => e.data === date).sort((a, b) => a.hora.localeCompare(b.hora));
 
   const getStatusBadge = (status: string) => {
     if (status === 'agendada') return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
@@ -190,8 +251,11 @@ export default function Agenda() {
 
   const navigate = (dir: 'prev' | 'next') => {
     const d = parseISO(selectedDate);
-    const fn = { day: [subDays, addDays], week: [subWeeks, addWeeks], month: [subMonths, addMonths] }[viewMode];
-    setSelectedDate(format((dir === 'prev' ? fn[0] : fn[1])(d, 1), 'yyyy-MM-dd'));
+    const fns: Record<ViewMode, [Function, Function]> = {
+      day: [subDays, addDays], week: [subWeeks, addWeeks], month: [subMonths, addMonths]
+    };
+    const [prev, next] = fns[viewMode];
+    setSelectedDate(format((dir === 'prev' ? prev : next)(d, 1), 'yyyy-MM-dd'));
   };
 
   const getNavTitle = () => {
@@ -221,16 +285,15 @@ export default function Agenda() {
   }, [selectedDate]);
 
   const AppointmentCard = ({ appt, compact = false }: { appt: any; compact?: boolean }) => {
-    const nomePaciente = appt.pacientes?.nome || pacientes.find(p => p.id === appt.paciente_id)?.nome || '—';
     if (compact) {
       return (
         <div
           className={`text-xs px-1.5 py-0.5 rounded-md truncate cursor-pointer hover:ring-1 hover:ring-purple-400/40 ${appt.status === 'concluida' ? 'bg-emerald-500/15 text-emerald-400'
-              : appt.status === 'cancelada' ? 'bg-red-500/15 text-red-400 line-through'
-                : 'bg-purple-500/15 text-purple-300'}`}
+            : appt.status === 'cancelada' ? 'bg-red-500/15 text-red-400 line-through'
+              : 'bg-purple-500/15 text-purple-300'}`}
           onClick={() => handleEdit(appt)}
         >
-          <span className="font-medium">{appt.hora}</span> {nomePaciente}
+          <span className="font-medium">{appt.hora}</span> {appt.titulo}
         </div>
       );
     }
@@ -241,21 +304,19 @@ export default function Agenda() {
           <span className="text-[10px] text-cyan-400 font-bold">{appt.hora}</span>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-white truncate">{nomePaciente}</p>
-          <p className="text-xs text-gray-500 mt-0.5">
-            R$ {Number(appt.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-          </p>
+          <p className="text-sm font-medium text-white truncate">{appt.titulo}</p>
+          {appt.descricao && <p className="text-xs text-gray-500 mt-0.5 truncate">{appt.descricao}</p>}
         </div>
         <span className={`px-2 py-0.5 rounded-lg text-[10px] font-medium border hidden sm:inline-block ${getStatusBadge(appt.status)}`}>
           {appt.status}
         </span>
         <div className="flex items-center gap-0.5">
           {appt.status === 'agendada' && (<>
-            <button onClick={() => handleStatusChange(appt, 'concluida')} className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-gray-500 hover:text-emerald-400 transition-colors cursor-pointer" title="Concluir"><Check className="w-4 h-4" /></button>
-            <button onClick={() => handleStatusChange(appt, 'cancelada')} className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-500 hover:text-red-400 transition-colors cursor-pointer" title="Cancelar"><X className="w-4 h-4" /></button>
+            <button onClick={() => handleStatusChange(appt, 'concluida')} className="p-1.5 rounded-lg hover:bg-emerald-500/10 text-gray-500 hover:text-emerald-400 cursor-pointer"><Check className="w-4 h-4" /></button>
+            <button onClick={() => handleStatusChange(appt, 'cancelada')} className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-500 hover:text-red-400 cursor-pointer"><X className="w-4 h-4" /></button>
           </>)}
-          <button onClick={() => handleEdit(appt)} className="p-1.5 rounded-lg hover:bg-white/10 text-gray-500 hover:text-white transition-colors cursor-pointer"><Edit3 className="w-4 h-4" /></button>
-          <button onClick={() => handleDelete(appt.id)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-500 hover:text-red-400 transition-colors cursor-pointer"><Trash2 className="w-4 h-4" /></button>
+          <button onClick={() => handleEdit(appt)} className="p-1.5 rounded-lg hover:bg-white/10 text-gray-500 hover:text-white cursor-pointer"><Edit3 className="w-4 h-4" /></button>
+          <button onClick={() => handleDelete(appt.id)} className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-500 hover:text-red-400 cursor-pointer"><Trash2 className="w-4 h-4" /></button>
         </div>
       </div>
     );
@@ -265,8 +326,8 @@ export default function Agenda() {
     const dayAppts = getAppointmentsForDay(selectedDate);
     const blockInfo = isDayBlocked(selectedDate);
     const now = new Date();
-    const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
     const isSelectedToday = selectedDate === format(now, 'yyyy-MM-dd');
+    const currentTimeMinutes = now.getHours() * 60 + now.getMinutes();
     return (
       <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl overflow-hidden">
         <div className="flex items-center gap-2 p-4 border-b border-white/5">
@@ -280,14 +341,12 @@ export default function Agenda() {
         </div>
         {blockInfo.blocked ? (
           <div className="p-16 flex flex-col items-center text-center">
-            <div className="w-20 h-20 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mb-4">
-              <Ban className="w-10 h-10 text-red-400/60" />
-            </div>
+            <Ban className="w-12 h-12 text-red-400/40 mb-4" />
             <h3 className="text-lg font-semibold text-red-400 mb-2">Dia não disponível</h3>
-            <p className="text-gray-500 text-sm">{blockInfo.reason === 'Sábado' || blockInfo.reason === 'Domingo' ? 'A clínica não funciona aos finais de semana.' : `Feriado: ${blockInfo.reason}`}</p>
+            <p className="text-gray-500 text-sm">{blockInfo.reason}</p>
             <button onClick={() => setSelectedDate(getNextWorkingDay(format(addDays(parseISO(selectedDate), 1), 'yyyy-MM-dd')))}
-              className="mt-4 px-4 py-2 bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/20 text-purple-300 rounded-xl text-sm cursor-pointer">
-              Ir para próximo dia útil →
+              className="mt-4 px-4 py-2 bg-purple-600/20 border border-purple-500/20 text-purple-300 rounded-xl text-sm cursor-pointer">
+              Próximo dia útil →
             </button>
           </div>
         ) : (
@@ -307,8 +366,8 @@ export default function Agenda() {
                       <div className="space-y-1">{slotAppts.map(a => <AppointmentCard key={a.id} appt={a} />)}</div>
                     ) : !isPast && (
                       <button onClick={() => openNewForm(selectedDate)}
-                        className="w-full h-full min-h-[40px] rounded-lg border border-dashed border-transparent group-hover:border-purple-500/20 transition-colors cursor-pointer flex items-center justify-center">
-                        <Plus className="w-4 h-4 text-transparent group-hover:text-purple-400/50 transition-colors" />
+                        className="w-full h-full min-h-[40px] rounded-lg border border-dashed border-transparent group-hover:border-purple-500/20 cursor-pointer flex items-center justify-center">
+                        <Plus className="w-4 h-4 text-transparent group-hover:text-purple-400/50" />
                       </button>
                     )}
                   </div>
@@ -333,22 +392,20 @@ export default function Agenda() {
             const blockInfo = isDayBlocked(dateStr);
             return (
               <button key={dateStr} onClick={() => setSelectedDate(dateStr)}
-                className={`flex flex-col items-center py-3 px-1 rounded-xl transition-all cursor-pointer ${blockInfo.blocked ? isSelected ? 'bg-red-500/10 border border-red-500/20 opacity-70' : 'opacity-40 border border-transparent'
-                    : isSelected ? 'bg-gradient-to-b from-purple-600/30 to-cyan-600/30 border border-purple-500/30'
-                      : isToday ? 'bg-white/5 border border-cyan-500/20' : 'hover:bg-white/5 border border-transparent'}`}>
+                className={`flex flex-col items-center py-3 px-1 rounded-xl cursor-pointer transition-all ${blockInfo.blocked ? 'opacity-40 border border-transparent'
+                  : isSelected ? 'bg-gradient-to-b from-purple-600/30 to-cyan-600/30 border border-purple-500/30'
+                    : isToday ? 'bg-white/5 border border-cyan-500/20' : 'hover:bg-white/5 border border-transparent'}`}>
                 <span className={`text-xs uppercase ${blockInfo.blocked ? 'text-red-400/60' : 'text-gray-500'}`}>
                   {format(day, 'EEE', { locale: ptBR })}
                 </span>
                 <span className={`text-lg font-bold mt-1 ${blockInfo.blocked ? 'text-red-400/50' : isSelected ? 'text-white' : isToday ? 'text-cyan-400' : 'text-gray-300'}`}>
                   {format(day, 'd')}
                 </span>
-                {blockInfo.blocked ? <Ban className="w-3 h-3 text-red-400/40 mt-1" />
-                  : dayAppts.length > 0 ? (
-                    <div className="flex gap-0.5 mt-1">
-                      {dayAppts.slice(0, 4).map((_, i) => <div key={i} className="w-1.5 h-1.5 rounded-full bg-purple-400" />)}
-                      {dayAppts.length > 4 && <span className="text-[8px] text-purple-400">+</span>}
-                    </div>
-                  ) : null}
+                {!blockInfo.blocked && dayAppts.length > 0 && (
+                  <div className="flex gap-0.5 mt-1">
+                    {dayAppts.slice(0, 4).map((_, i) => <div key={i} className="w-1.5 h-1.5 rounded-full bg-purple-400" />)}
+                  </div>
+                )}
               </button>
             );
           })}
@@ -363,29 +420,27 @@ export default function Agenda() {
           const blockInfo = isDayBlocked(dateStr);
           return (
             <div key={dateStr} onClick={() => setSelectedDate(dateStr)}
-              className={`bg-white/5 backdrop-blur-sm border rounded-xl p-4 cursor-pointer transition-all ${blockInfo.blocked ? 'border-red-500/10 opacity-50' : isSelected ? 'border-purple-500/30 ring-1 ring-purple-500/20' : isToday ? 'border-cyan-500/20' : 'border-white/5 hover:border-white/10'}`}>
+              className={`bg-white/5 border rounded-xl p-4 cursor-pointer transition-all ${blockInfo.blocked ? 'border-red-500/10 opacity-50'
+                : isSelected ? 'border-purple-500/30 ring-1 ring-purple-500/20'
+                  : isToday ? 'border-cyan-500/20' : 'border-white/5 hover:border-white/10'}`}>
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <span className={`text-sm font-semibold capitalize ${blockInfo.blocked ? 'text-red-400/60' : isToday ? 'text-cyan-400' : 'text-gray-300'}`}>
                     {format(day, 'EEEE', { locale: ptBR })}
                   </span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${blockInfo.blocked ? 'bg-red-500/10 text-red-400/60' : isToday ? 'bg-cyan-500/20 text-cyan-400' : 'bg-white/5 text-gray-500'}`}>
+                  <span className={`text-xs px-2 py-0.5 rounded-full ${isToday ? 'bg-cyan-500/20 text-cyan-400' : 'bg-white/5 text-gray-500'}`}>
                     {format(day, 'dd/MM')}
                   </span>
                 </div>
-                {blockInfo.blocked ? (
-                  <div className="flex items-center gap-1 text-xs text-red-400/60"><Ban className="w-3 h-3" />{blockInfo.reason}</div>
-                ) : dayAppts.length > 0 ? (
-                  <span className="text-xs text-gray-500">{dayAppts.length} consulta(s)</span>
-                ) : null}
+                {blockInfo.blocked
+                  ? <div className="flex items-center gap-1 text-xs text-red-400/60"><Ban className="w-3 h-3" />{blockInfo.reason}</div>
+                  : dayAppts.length > 0 && <span className="text-xs text-gray-500">{dayAppts.length} consulta(s)</span>}
               </div>
-              {blockInfo.blocked ? (
-                <div className="flex items-center justify-center py-3 gap-2 text-red-400/40"><Ban className="w-4 h-4" /><p className="text-xs">Não funciona</p></div>
-              ) : dayAppts.length === 0 ? (
-                <p className="text-xs text-gray-600 py-2 text-center">Sem consultas</p>
-              ) : (
-                <div className="space-y-1">{dayAppts.map(a => <AppointmentCard key={a.id} appt={a} compact />)}</div>
-              )}
+              {blockInfo.blocked
+                ? <div className="flex items-center justify-center py-3 gap-2 text-red-400/40"><Ban className="w-4 h-4" /><p className="text-xs">Não funciona</p></div>
+                : dayAppts.length === 0
+                  ? <p className="text-xs text-gray-600 py-2 text-center">Sem consultas</p>
+                  : <div className="space-y-1">{dayAppts.map(a => <AppointmentCard key={a.id} appt={a} compact />)}</div>}
             </div>
           );
         })}
@@ -413,32 +468,26 @@ export default function Agenda() {
             const blockInfo = isDayBlocked(dateStr);
             return (
               <button key={idx} onClick={() => { setSelectedDate(dateStr); if (!blockInfo.blocked && dayAppts.length > 0) setViewMode('day'); }}
-                className={`min-h-[100px] p-2 border-b border-r border-white/5 transition-all cursor-pointer text-left ${!isCurrentMonth ? 'opacity-20' : blockInfo.blocked ? 'bg-red-500/[0.02]'
-                    : isSelected ? 'bg-purple-500/10' : isToday ? 'bg-cyan-500/5' : isPastDay ? 'opacity-50' : 'hover:bg-white/5'}`}>
+                className={`min-h-[100px] p-2 border-b border-r border-white/5 cursor-pointer text-left transition-all ${!isCurrentMonth ? 'opacity-20' : blockInfo.blocked ? 'bg-red-500/[0.02]'
+                  : isSelected ? 'bg-purple-500/10' : isToday ? 'bg-cyan-500/5' : isPastDay ? 'opacity-50' : 'hover:bg-white/5'}`}>
                 <div className="flex items-center justify-between mb-1">
-                  <span className={`text-sm font-medium ${isToday ? 'bg-cyan-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs'
-                      : blockInfo.blocked ? 'text-red-400/40' : isSelected ? 'text-purple-400' : 'text-gray-400'}`}>
+                  <span className={`text-sm font-medium ${isToday ? 'bg-cyan-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs' : blockInfo.blocked ? 'text-red-400/40' : isSelected ? 'text-purple-400' : 'text-gray-400'}`}>
                     {format(day, 'd')}
                   </span>
                   {!blockInfo.blocked && dayAppts.length > 0 && (
                     <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded-full">{dayAppts.length}</span>
                   )}
                 </div>
-                {blockInfo.blocked && isCurrentMonth ? (
-                  <div className="flex items-center gap-1 text-[8px] text-red-400/70"><Ban className="w-2 h-2" /><span className="truncate">{blockInfo.reason}</span></div>
-                ) : (
-                  <div className="space-y-0.5">
+                {blockInfo.blocked && isCurrentMonth
+                  ? <div className="flex items-center gap-1 text-[8px] text-red-400/70"><Ban className="w-2 h-2" /><span className="truncate">{blockInfo.reason}</span></div>
+                  : <div className="space-y-0.5">
                     {dayAppts.slice(0, 3).map(a => (
-                      <div key={a.id} className={`text-[10px] px-1 py-0.5 rounded truncate ${a.status === 'concluida' ? 'bg-emerald-500/15 text-emerald-400'
-                          : a.status === 'cancelada' ? 'bg-red-500/15 text-red-400'
-                            : 'bg-purple-500/15 text-purple-300'}`}>
-                        <span className="font-medium">{a.hora}</span>{' '}
-                        <span className="hidden sm:inline">{(a.pacientes?.nome || '').split(' ')[0]}</span>
+                      <div key={a.id} className={`text-[10px] px-1 py-0.5 rounded truncate ${a.status === 'concluida' ? 'bg-emerald-500/15 text-emerald-400' : a.status === 'cancelada' ? 'bg-red-500/15 text-red-400' : 'bg-purple-500/15 text-purple-300'}`}>
+                        <span className="font-medium">{a.hora}</span> {a.titulo.split(' ').slice(-1)[0]}
                       </div>
                     ))}
                     {dayAppts.length > 3 && <p className="text-[9px] text-gray-500 pl-1">+{dayAppts.length - 3} mais</p>}
-                  </div>
-                )}
+                  </div>}
               </button>
             );
           })}
@@ -452,12 +501,45 @@ export default function Agenda() {
 
   if (loading) return <div className="text-center py-12 text-gray-500">Carregando...</div>;
 
+  // Tela de login Google
+  if (!googleLogado) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Agenda</h1>
+          <p className="text-gray-400 mt-1 text-sm">Gerencie as consultas da clínica</p>
+        </div>
+        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-12 flex flex-col items-center text-center">
+          <CalendarDays className="w-16 h-16 text-purple-400 mb-4" />
+          <h2 className="text-xl font-semibold text-white mb-2">Conectar Google Calendar</h2>
+          <p className="text-gray-400 text-sm mb-6 max-w-sm">
+            Para ver e gerenciar sua agenda, conecte sua conta Google.
+          </p>
+          <button onClick={handleLoginGoogle} disabled={loginLoading}
+            className="inline-flex items-center gap-3 px-6 py-3 bg-white text-gray-800 font-medium rounded-xl hover:bg-gray-100 transition-all cursor-pointer disabled:opacity-50 shadow-lg">
+            {loginLoading ? (
+              <div className="w-5 h-5 border-2 border-gray-400/30 border-t-gray-600 rounded-full animate-spin" />
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
+                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
+                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
+                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
+              </svg>
+            )}
+            Entrar com Google
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Agenda</h1>
-          <p className="text-gray-400 mt-1 text-sm">Gerencie as consultas da clínica</p>
+          <p className="text-gray-400 mt-1 text-sm">Google Calendar conectado</p>
         </div>
         <button onClick={() => openNewForm()}
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 hover:from-purple-500 hover:to-cyan-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-purple-500/25 cursor-pointer text-sm">
@@ -481,11 +563,10 @@ export default function Agenda() {
             })}
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={() => navigate('prev')} className="p-2 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"><ChevronLeft className="w-5 h-5" /></button>
-            <button onClick={() => setSelectedDate(format(new Date(), 'yyyy-MM-dd'))}
-              className="px-4 py-1.5 text-sm bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white rounded-lg transition-all cursor-pointer">Hoje</button>
+            <button onClick={() => navigate('prev')} className="p-2 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white cursor-pointer"><ChevronLeft className="w-5 h-5" /></button>
+            <button onClick={() => setSelectedDate(format(new Date(), 'yyyy-MM-dd'))} className="px-4 py-1.5 text-sm bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 rounded-lg cursor-pointer">Hoje</button>
             <h3 className="text-sm font-medium text-gray-300 min-w-[200px] text-center capitalize">{getNavTitle()}</h3>
-            <button onClick={() => navigate('next')} className="p-2 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white transition-colors cursor-pointer"><ChevronRight className="w-5 h-5" /></button>
+            <button onClick={() => navigate('next')} className="p-2 rounded-lg hover:bg-white/10 text-gray-400 hover:text-white cursor-pointer"><ChevronRight className="w-5 h-5" /></button>
           </div>
         </div>
       </div>
@@ -503,12 +584,6 @@ export default function Agenda() {
                 <AlertTriangle className="w-4 h-4 shrink-0" />{formError}
               </div>
             )}
-            {formDateBlockInfo.blocked && (
-              <div className="flex items-center gap-2 p-3 mb-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">
-                <Ban className="w-4 h-4 shrink-0" />
-                <div><p className="font-medium">Dia indisponível: {formDateBlockInfo.reason}</p></div>
-              </div>
-            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Paciente *</label>
@@ -517,26 +592,18 @@ export default function Agenda() {
                   <option value="">Selecione um paciente</option>
                   {pacientes.map(p => <option key={p.id} value={p.id} className="bg-[#1a1035]">{p.nome}</option>)}
                 </select>
-                {pacientes.length === 0 && <p className="text-xs text-amber-400 mt-1">⚠ Cadastre pacientes primeiro</p>}
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-1">Data *</label>
                 <input type="date" value={formData.date} min={format(new Date(), 'yyyy-MM-dd')}
-                  onChange={e => {
-                    const nd = e.target.value;
-                    const bi = isDayBlocked(nd);
-                    setFormError(bi.blocked ? `${bi.reason} — A clínica não funciona neste dia.` : '');
-                    const slots = getAvailableTimeSlots(nd);
-                    const first = slots.find(s => !s.isPast);
-                    setFormData(f => ({ ...f, date: nd, time: first?.time || f.time }));
-                  }}
-                  className={`w-full px-4 py-2.5 bg-white/5 border rounded-xl text-white focus:outline-none focus:ring-2 transition-all [color-scheme:dark] ${formDateBlockInfo.blocked ? 'border-red-500/30 focus:ring-red-500/50' : 'border-white/10 focus:ring-purple-500/50'}`} required />
+                  onChange={e => setFormData(f => ({ ...f, date: e.target.value }))}
+                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 [color-scheme:dark]" required />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm text-gray-400 mb-1">Horário *</label>
                   <select value={formData.time} onChange={e => setFormData(f => ({ ...f, time: e.target.value }))}
-                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50" required disabled={formDateBlockInfo.blocked}>
+                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50" required>
                     {availableSlots.map(s => (
                       <option key={s.time} value={s.time} className="bg-[#1a1035]" disabled={s.isPast && !editingAppt}>
                         {s.time}{s.isPast && !editingAppt ? ' (indisponível)' : ''}
@@ -545,17 +612,26 @@ export default function Agenda() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-gray-400 mb-1">Valor (R$) *</label>
-                  <input type="number" step="0.01" min="0" value={formData.value}
-                    onChange={e => setFormData(f => ({ ...f, value: e.target.value }))}
-                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                    placeholder="150.00" required />
+                  <label className="block text-sm text-gray-400 mb-1">Duração</label>
+                  <select value={formData.duracao} onChange={e => setFormData(f => ({ ...f, duracao: e.target.value }))}
+                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50">
+                    <option value="30" className="bg-[#1a1035]">30 min</option>
+                    <option value="50" className="bg-[#1a1035]">50 min</option>
+                    <option value="60" className="bg-[#1a1035]">1 hora</option>
+                    <option value="90" className="bg-[#1a1035]">1h30</option>
+                  </select>
                 </div>
               </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Observações</label>
+                <textarea value={formData.descricao} onChange={e => setFormData(f => ({ ...f, descricao: e.target.value }))}
+                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none h-20"
+                  placeholder="Observações..." />
+              </div>
               <div className="flex gap-3 pt-2">
-                <button type="button" onClick={resetForm} className="flex-1 py-2.5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all cursor-pointer text-sm">Cancelar</button>
+                <button type="button" onClick={resetForm} className="flex-1 py-2.5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl cursor-pointer text-sm">Cancelar</button>
                 <button type="submit" disabled={formDateBlockInfo.blocked || (!editingAppt && isTimeInPast(formData.date, formData.time))}
-                  className="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-medium rounded-xl shadow-lg cursor-pointer text-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                  className="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-medium rounded-xl cursor-pointer text-sm disabled:opacity-40 disabled:cursor-not-allowed">
                   {editingAppt ? 'Salvar' : 'Agendar'}
                 </button>
               </div>
