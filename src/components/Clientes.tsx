@@ -14,7 +14,7 @@ export default function Clientes() {
     const [confirmErro, setConfirmErro] = useState('')
 
     const [form, setForm] = useState({
-        email: '', senha: '', nome_empresa: '', titulo_site: '', google_client_id: '',
+        email: '', senha: '', nome_empresa: '', titulo_site: '', google_client_id: '', cpf_cnpj: '',
     })
 
     useEffect(() => { carregar() }, [])
@@ -29,7 +29,7 @@ export default function Clientes() {
     }
 
     function resetForm() {
-        setForm({ email: '', senha: '', nome_empresa: '', titulo_site: '', google_client_id: '' })
+        setForm({ email: '', senha: '', nome_empresa: '', titulo_site: '', google_client_id: '', cpf_cnpj: '' })
         setEditando(null)
         setShowForm(false)
         setErro('')
@@ -42,6 +42,7 @@ export default function Clientes() {
             nome_empresa: cliente.nome_empresa || '',
             titulo_site: cliente.titulo_site || '',
             google_client_id: cliente.google_client_id || '',
+            cpf_cnpj: cliente.cpf_cnpj || '',
         })
         setEditando(cliente)
         setShowForm(true)
@@ -56,10 +57,11 @@ export default function Clientes() {
                     nome_empresa: form.nome_empresa,
                     titulo_site: form.titulo_site,
                     google_client_id: form.google_client_id,
+                    cpf_cnpj: form.cpf_cnpj,
                 })
             } else {
                 if (!form.email || !form.senha) { setErro('Email e senha são obrigatórios'); return }
-                await criarCliente(form)
+                await criarCliente({ ...form })
             }
             resetForm()
             carregar()
@@ -113,6 +115,7 @@ export default function Clientes() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                     <h3 className="text-sm font-semibold text-white truncate">{c.nome_empresa || '—'}</h3>
+                                    {c.cpf_cnpj && <p className="text-xs text-gray-400 mt-0.5">{c.cpf_cnpj}</p>}
                                     <p className="text-xs text-gray-500 mt-0.5">Título: {c.titulo_site || '—'}</p>
                                     {c.google_client_id && (
                                         <p className="text-xs text-emerald-400 mt-0.5">Google Calendar configurado</p>
@@ -134,7 +137,6 @@ export default function Clientes() {
                 </div>
             )}
 
-            {/* Form Modal */}
             {showForm && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
                     <div className="bg-[#1a1035] border border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -176,6 +178,12 @@ export default function Clientes() {
                                     placeholder="Ex: Clínica Saúde Mental" required />
                             </div>
                             <div>
+                                <label className="block text-sm text-gray-400 mb-1">CPF / CNPJ *</label>
+                                <input type="text" value={form.cpf_cnpj} onChange={e => setForm(f => ({ ...f, cpf_cnpj: e.target.value }))}
+                                    className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                                    placeholder="000.000.000-00 ou 00.000.000/0001-00" required />
+                            </div>
+                            <div>
                                 <label className="block text-sm text-gray-400 mb-1">Título no site *</label>
                                 <input type="text" value={form.titulo_site} onChange={e => setForm(f => ({ ...f, titulo_site: e.target.value }))}
                                     className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50"
@@ -203,7 +211,6 @@ export default function Clientes() {
                 </div>
             )}
 
-            {/* Modal dupla confirmação para deletar */}
             {confirmDelete && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
                     <div className="bg-[#1a1035] border border-red-500/20 rounded-2xl p-6 w-full max-w-sm shadow-2xl">

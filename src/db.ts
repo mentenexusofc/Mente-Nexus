@@ -235,6 +235,7 @@ export async function criarCliente(cliente: {
     nome_empresa: string
     titulo_site: string
     google_client_id?: string
+    cpf_cnpj?: string
 }) {
     // Cria o usuário no Supabase Auth
     const { data, error } = await supabase.auth.admin.createUser({
@@ -251,6 +252,7 @@ export async function criarCliente(cliente: {
             nome_empresa: cliente.nome_empresa,
             titulo_site: cliente.titulo_site,
             google_client_id: cliente.google_client_id || null,
+            cpf_cnpj: cliente.cpf_cnpj || null,
             role: 'client',
         })
         .eq('id', data.user.id)
@@ -263,6 +265,7 @@ export async function atualizarCliente(id: string, dados: {
     nome_empresa?: string
     titulo_site?: string
     google_client_id?: string
+    cpf_cnpj?: string
 }) {
     const { error } = await supabase
         .from('perfis')
