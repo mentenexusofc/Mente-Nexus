@@ -3,13 +3,13 @@ import {
   CalendarDays, Plus, ChevronLeft, ChevronRight, Clock, Trash2,
   Check, X, Edit3, AlertTriangle, Calendar, Columns3, LayoutGrid, Ban
 } from 'lucide-react';
-import { initGoogle, loginGoogle, getAccessToken, getEventos, criarEvento, atualizarEvento, deletarEvento } from '../googleCalendar';
 import { getPacientes } from '../db';
 import {
   format, addDays, subDays, parseISO, startOfWeek, endOfWeek,
   addWeeks, subWeeks, startOfMonth, endOfMonth, addMonths, subMonths,
   isSameMonth, eachDayOfInterval, isToday as isTodayFn, isBefore, getDay
 } from 'date-fns';
+import { initGoogle, loginGoogle, loginGoogleSilent, getAccessToken, getEventos, criarEvento, atualizarEvento, deletarEvento } from '../googleCalendar';
 import { ptBR } from 'date-fns/locale';
 
 type ViewMode = 'day' | 'week' | 'month';
@@ -96,8 +96,13 @@ export default function Agenda() {
   });
 
   useEffect(() => {
-    initGoogle().then(() => {
+    initGoogle().then(async () => {
       getPacientes().then(p => setPacientes(p || []));
+      // Tenta renovar o token silenciosamente
+      const token = await loginGoogleSilent();
+      if (token) {
+        setGoogleLogado(true);
+      }
       setLoading(false);
     });
   }, []);
