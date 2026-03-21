@@ -24,6 +24,7 @@ export default function App() {
       setUserEmail(session?.user?.email || '')
       if (session) {
         const p = await getMeuPerfil()
+        console.log('PERFIL:', p)
         setPerfil(p)
       }
     })
