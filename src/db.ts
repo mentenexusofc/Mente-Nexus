@@ -205,3 +205,73 @@ export async function getResumoDashboard() {
         receitaMes,
     }
 }
+
+// ─── PERFIS ──────────────────────────────────────────────
+
+export async function getMeuPerfil() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+    const { data } = await supabase
+        .from('perfis')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+    return data
+}
+
+export async function getTodosClientes() {
+    const { data, error } = await supabase
+        .from('perfis')
+        .select('*, auth_users:id(email)')
+        .eq('role', 'client')
+        .order('criado_em', { ascending: false })
+    if (error) throw error
+    return data || []
+}
+
+export async function criarCliente(cliente: {
+    email: string
+    senha: string
+    nome_empresa: string
+    titulo_site: string
+    google_client_id?: string
+}) {
+    // Cria o usuário no Supabase Auth
+    const { data, error } = await supabase.auth.admin.createUser({
+        email: cliente.email,
+        password: cliente.senha,
+        email_confirm: true,
+    })
+    if (error) throw error
+
+    // Atualiza o perfil com os dados da empresa
+    const { error: perfError } = await supabase
+        .from('perfis')
+        .update({
+            nome_empresa: cliente.nome_empresa,
+            titulo_site: cliente.titulo_site,
+            google_client_id: cliente.google_client_id || null,
+            role: 'client',
+        })
+        .eq('id', data.user.id)
+    if (perfError) throw perfError
+
+    return data.user
+}
+
+export async function atualizarCliente(id: string, dados: {
+    nome_empresa?: string
+    titulo_site?: string
+    google_client_id?: string
+}) {
+    const { error } = await supabase
+        .from('perfis')
+        .update(dados)
+        .eq('id', id)
+    if (error) throw error
+}
+
+export async function removerCliente(id: string) {
+    const { error } = await supabase.auth.admin.deleteUser(id)
+    if (error) throw error
+}
