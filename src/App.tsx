@@ -13,10 +13,12 @@ export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentPage, setCurrentPage] = useState<Page>('dashboard');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [userEmail, setUserEmail] = useState('');
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setIsAuthenticated(!!session);
+      setUserEmail(session?.user?.email || '');
     });
   }, []);
 
@@ -40,12 +42,14 @@ export default function App() {
       <Sidebar
         currentPage={currentPage}
         onNavigate={setCurrentPage}
+
         onLogout={async () => {
           await supabase.auth.signOut();
           setIsAuthenticated(false);
         }}
         mobileOpen={mobileMenuOpen}
         onCloseMobile={() => setMobileMenuOpen(false)}
+        userEmail={userEmail}
       />
 
       {/* Main content */}
