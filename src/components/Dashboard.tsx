@@ -1,6 +1,7 @@
+import { useState, useEffect } from 'react';
 import { Users, CalendarDays, DollarSign, Clock, TrendingUp, Activity } from 'lucide-react';
-import { getPatients, getAppointments } from '../store';
-import { format, parseISO, isThisMonth } from 'date-fns';
+import { getResumoDashboard, getConsultas, getPacientes } from '../db';
+import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 interface Props {
@@ -8,47 +9,67 @@ interface Props {
 }
 
 export default function Dashboard({ onNavigate }: Props) {
-  const patients = getPatients();
-  const appointments = getAppointments();
-  const today = format(new Date(), 'yyyy-MM-dd');
+  const [resumo, setResumo] = useState({ totalPacientes: 0, consultasHoje: 0, agendadas: 0, receitaMes: 0 });
+  const [proximas, setProximas] = useState<any[]>([]);
+  const [concluidas, setConcluidas] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const todayAppointments = appointments.filter(a => a.date === today);
-  const completedThisMonth = appointments.filter(a => {
+  useEffect(() => { carregarDados(); }, []);
+
+  async function carregarDados() {
+    setLoading(true);
     try {
-      return a.status === 'concluída' && isThisMonth(parseISO(a.date));
-    } catch { return false; }
-  });
-  const monthRevenue = completedThisMonth.reduce((sum, a) => sum + a.value, 0);
-  const scheduledAppointments = appointments.filter(a => a.status === 'agendada');
+      const hoje = format(new Date(), 'yyyy-MM-dd');
+      const [r, consultas, pacientes] = await Promise.all([
+        getResumoDashboard(),
+        getConsultas(),
+        getPacientes(),
+      ]);
 
-  const upcomingAppointments = appointments
-    .filter(a => a.date >= today && a.status === 'agendada')
-    .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
-    .slice(0, 5);
+      setResumo(r);
 
-  const recentAppointments = appointments
-    .filter(a => a.status === 'concluída')
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 5);
+      const comNome = (c: any) => ({
+        ...c,
+        patientName: c.pacientes?.nome || pacientes.find((p: any) => p.id === c.paciente_id)?.nome || '—',
+      });
+
+      setProximas(
+        consultas
+          .filter((c: any) => c.data >= hoje && c.status === 'agendada')
+          .sort((a: any, b: any) => a.data.localeCompare(b.data) || a.hora.localeCompare(b.hora))
+          .slice(0, 5)
+          .map(comNome)
+      );
+
+      setConcluidas(
+        consultas
+          .filter((c: any) => c.status === 'concluida')
+          .sort((a: any, b: any) => b.data.localeCompare(a.data))
+          .slice(0, 5)
+          .map(comNome)
+      );
+    } catch (err) {
+      console.error(err);
+    }
+    setLoading(false);
+  }
 
   const stats = [
-    { label: 'Pacientes', value: patients.length, icon: Users, color: 'from-purple-600 to-purple-400', shadow: 'shadow-purple-500/25' },
-    { label: 'Consultas Hoje', value: todayAppointments.length, icon: CalendarDays, color: 'from-cyan-600 to-cyan-400', shadow: 'shadow-cyan-500/25' },
-    { label: 'Agendadas', value: scheduledAppointments.length, icon: Clock, color: 'from-amber-600 to-amber-400', shadow: 'shadow-amber-500/25' },
-    { label: 'Receita do Mês', value: `R$ ${monthRevenue.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: DollarSign, color: 'from-emerald-600 to-emerald-400', shadow: 'shadow-emerald-500/25' },
+    { label: 'Pacientes', value: resumo.totalPacientes, icon: Users, color: 'from-purple-600 to-purple-400', shadow: 'shadow-purple-500/25' },
+    { label: 'Consultas Hoje', value: resumo.consultasHoje, icon: CalendarDays, color: 'from-cyan-600 to-cyan-400', shadow: 'shadow-cyan-500/25' },
+    { label: 'Agendadas', value: resumo.agendadas, icon: Clock, color: 'from-amber-600 to-amber-400', shadow: 'shadow-amber-500/25' },
+    { label: 'Receita do Mês', value: `R$ ${resumo.receitaMes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, icon: DollarSign, color: 'from-emerald-600 to-emerald-400', shadow: 'shadow-emerald-500/25' },
   ];
 
   const formatDate = (dateStr: string) => {
-    try {
-      return format(parseISO(dateStr), "dd 'de' MMM", { locale: ptBR });
-    } catch {
-      return dateStr;
-    }
+    try { return format(parseISO(dateStr), "dd 'de' MMM", { locale: ptBR }); }
+    catch { return dateStr; }
   };
+
+  if (loading) return <div className="text-center py-12 text-gray-500">Carregando...</div>;
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white">Dashboard</h1>
         <p className="text-gray-400 mt-1">
@@ -56,9 +77,8 @@ export default function Dashboard({ onNavigate }: Props) {
         </p>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {stats.map((stat) => (
+        {stats.map(stat => (
           <div key={stat.label} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-5 hover:bg-white/[0.07] transition-all">
             <div className="flex items-center justify-between">
               <div>
@@ -73,9 +93,7 @@ export default function Dashboard({ onNavigate }: Props) {
         ))}
       </div>
 
-      {/* Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Upcoming */}
         <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -86,35 +104,31 @@ export default function Dashboard({ onNavigate }: Props) {
               Ver agenda →
             </button>
           </div>
-
-          {upcomingAppointments.length === 0 ? (
+          {proximas.length === 0 ? (
             <div className="text-center py-8">
               <CalendarDays className="w-12 h-12 text-gray-600 mx-auto mb-3" />
               <p className="text-gray-500 text-sm">Nenhuma consulta agendada</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {upcomingAppointments.map(appt => (
-                <div key={appt.id} className="flex items-center gap-4 p-3 rounded-xl bg-white/5 hover:bg-white/[0.07] transition-all">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-600/20 to-purple-600/20 border border-cyan-500/20 flex flex-col items-center justify-center">
-                    <span className="text-xs text-cyan-400 font-bold">{appt.time}</span>
+              {proximas.map(c => (
+                <div key={c.id} className="flex items-center gap-4 p-3 rounded-xl bg-white/5 hover:bg-white/[0.07] transition-all">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-600/20 to-purple-600/20 border border-cyan-500/20 flex items-center justify-center">
+                    <span className="text-xs text-cyan-400 font-bold">{c.hora}</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{appt.patientName}</p>
-                    <p className="text-xs text-gray-500">{formatDate(appt.date)}</p>
+                    <p className="text-sm font-medium text-white truncate">{c.patientName}</p>
+                    <p className="text-xs text-gray-500">{formatDate(c.data)}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-emerald-400">
-                      R$ {appt.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
+                  <p className="text-sm font-medium text-emerald-400">
+                    R$ {Number(c.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
                 </div>
               ))}
             </div>
           )}
         </div>
 
-        {/* Recent Completed */}
         <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -125,28 +139,25 @@ export default function Dashboard({ onNavigate }: Props) {
               Ver pacientes →
             </button>
           </div>
-
-          {recentAppointments.length === 0 ? (
+          {concluidas.length === 0 ? (
             <div className="text-center py-8">
               <Activity className="w-12 h-12 text-gray-600 mx-auto mb-3" />
               <p className="text-gray-500 text-sm">Nenhuma consulta concluída</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {recentAppointments.map(appt => (
-                <div key={appt.id} className="flex items-center gap-4 p-3 rounded-xl bg-white/5 hover:bg-white/[0.07] transition-all">
+              {concluidas.map(c => (
+                <div key={c.id} className="flex items-center gap-4 p-3 rounded-xl bg-white/5 hover:bg-white/[0.07] transition-all">
                   <div className="w-10 h-10 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center">
                     <span className="text-emerald-400 text-sm">✓</span>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-white truncate">{appt.patientName}</p>
-                    <p className="text-xs text-gray-500">{formatDate(appt.date)} às {appt.time}</p>
+                    <p className="text-sm font-medium text-white truncate">{c.patientName}</p>
+                    <p className="text-xs text-gray-500">{formatDate(c.data)} às {c.hora}</p>
                   </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-emerald-400">
-                      R$ {appt.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </p>
-                  </div>
+                  <p className="text-sm font-medium text-emerald-400">
+                    R$ {Number(c.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </p>
                 </div>
               ))}
             </div>
