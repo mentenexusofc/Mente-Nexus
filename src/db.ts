@@ -235,32 +235,26 @@ export async function criarCliente(cliente: {
     nome_empresa: string
     titulo_site: string
     google_client_id?: string
-    google_client_secret?: string
     cpf_cnpj?: string
 }) {
-    // Cria o usuário no Supabase Auth
-    const { data, error } = await supabase.auth.admin.createUser({
-        email: cliente.email,
-        password: cliente.senha,
-        email_confirm: true,
-    })
-    if (error) throw error
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) throw new Error('Não autenticado')
 
-    // Atualiza o perfil com os dados da empresa + OAuth
-    const { error: perfError } = await supabase
-        .from('perfis')
-        .update({
-            nome_empresa: cliente.nome_empresa,
-            titulo_site: cliente.titulo_site,
-            google_client_id: cliente.google_client_id || null,
-            google_client_secret: cliente.google_client_secret || null,
-            cpf_cnpj: cliente.cpf_cnpj || null,
-            role: 'client',
-        })
-        .eq('id', data.user.id)
-    if (perfError) throw perfError
+    const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/criar-cliente`,
+        {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`,
+            },
+            body: JSON.stringify(cliente),
+        }
+    )
 
-    return data.user
+    const data = await response.json()
+    if (!response.ok) throw new Error(data.error || 'Erro ao criar cliente')
+    return data
 }
 
 export async function atualizarCliente(id: string, dados: {
