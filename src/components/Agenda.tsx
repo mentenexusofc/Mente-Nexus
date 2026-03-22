@@ -3,7 +3,7 @@ import {
   CalendarDays, Plus, ChevronLeft, ChevronRight, Clock, Trash2,
   Check, X, Edit3, AlertTriangle, Calendar, Columns3, LayoutGrid, Ban
 } from 'lucide-react';
-import { getPacientes } from '../db';
+import { getPacientes, getConsultas } from '../db';
 import {
   format, addDays, subDays, parseISO, startOfWeek, endOfWeek,
   addWeeks, subWeeks, startOfMonth, endOfMonth, addMonths, subMonths,
@@ -120,13 +120,37 @@ export default function Agenda() {
   }
 
   async function carregarEventos() {
-    if (!getAccessToken()) return;
     try {
       const d = parseISO(selectedDate);
       const inicio = format(startOfMonth(addMonths(d, -1)), 'yyyy-MM-dd');
       const fim = format(endOfMonth(addMonths(d, 1)), 'yyyy-MM-dd');
-      const evs = await getEventos(inicio, fim);
-      setEventos(evs.map(googleEventToAppt));
+
+      const consultasSupabase = await getConsultas();
+      const eventosSupabase = (consultasSupabase || []).map((c: any) => ({
+        id: c.id,
+        titulo: c.pacientes?.nome ? `Consulta - ${c.pacientes.nome}` : 'Consulta',
+        data: c.data,
+        hora: c.hora?.slice(0, 5) || '00:00',
+        descricao: '',
+        status: c.status || 'agendada',
+        fonte: 'supabase',
+      }));
+
+      let eventosGoogle: any[] = [];
+      if (getAccessToken()) {
+        const evs = await getEventos(inicio, fim);
+        eventosGoogle = evs.map(googleEventToAppt).map((e: any) => ({
+          ...e,
+          fonte: 'google',
+        }));
+      }
+
+      const todos = [...eventosSupabase, ...eventosGoogle];
+      const unicos = todos.filter((ev, idx, arr) =>
+        arr.findIndex(e => e.data === ev.data && e.hora === ev.hora && e.titulo === ev.titulo) === idx
+      );
+
+      setEventos(unicos);
     } catch (err) {
       console.error(err);
     }
