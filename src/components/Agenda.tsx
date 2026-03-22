@@ -126,6 +126,7 @@ export default function Agenda() {
       const fim = format(endOfMonth(addMonths(d, 1)), 'yyyy-MM-dd');
 
       const consultasSupabase = await getConsultas();
+      console.log('CONSULTAS SUPABASE:', consultasSupabase);
       const eventosSupabase = (consultasSupabase || []).map((c: any) => ({
         id: c.id,
         titulo: c.pacientes?.nome ? `Consulta - ${c.pacientes.nome}` : 'Consulta',
@@ -146,6 +147,7 @@ export default function Agenda() {
       }
 
       const todos = [...eventosSupabase, ...eventosGoogle];
+      console.log('TOTAL EVENTOS:', todos.length);
       const unicos = todos.filter((ev, idx, arr) =>
         arr.findIndex(e => e.data === ev.data && e.hora === ev.hora && e.titulo === ev.titulo) === idx
       );
