@@ -46,8 +46,8 @@ export default function Sidebar({ currentPage, onNavigate, onLogout, mobileOpen,
             key={item.id}
             onClick={() => { onNavigate(item.id); onCloseMobile(); }}
             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${currentPage === item.id
-                ? 'bg-gradient-to-r from-purple-600/20 to-cyan-600/20 text-white border border-purple-500/20'
-                : 'text-gray-400 hover:text-white hover:bg-white/5'
+              ? 'bg-gradient-to-r from-purple-600/20 to-cyan-600/20 text-white border border-purple-500/20'
+              : 'text-gray-400 hover:text-white hover:bg-white/5'
               }`}
           >
             <item.icon className="w-5 h-5" />
@@ -86,5 +86,19 @@ export default function Sidebar({ currentPage, onNavigate, onLogout, mobileOpen,
         </div>
       )}
     </>
+  );
+}
+import { useTheme } from "../store/theme";
+
+export default function ThemeSwitcher() {
+  const { setTheme } = useTheme();
+
+  return (
+    <div>
+      <button onClick={() => setTheme("light")}>Branco</button>
+      <button onClick={() => setTheme("dark")}>Preto</button>
+      <button onClick={() => setTheme("blue")}>Azul</button>
+      <button onClick={() => setTheme("pink")}>Rosa</button>
+    </div>
   );
 }

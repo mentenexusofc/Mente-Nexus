@@ -2,11 +2,7 @@ import { useState } from 'react';
 import { Brain, Eye, EyeOff, LogIn } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
-interface Props {
-  onLogin: () => void;
-}
-
-export default function LoginPage({ onLogin }: Props) {
+export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -25,11 +21,9 @@ export default function LoginPage({ onLogin }: Props) {
 
     if (error) {
       setError('Email ou senha incorretos');
-    } else {
-      onLogin();
+      setLoading(false);
     }
-
-    setLoading(false);
+    // Sem else — o onAuthStateChange no App.tsx detecta o login automaticamente
   };
 
   return (
@@ -119,9 +113,7 @@ export default function LoginPage({ onLogin }: Props) {
           </form>
 
           <div className="mt-6 pt-6 border-t border-white/10">
-            <p className="text-gray-500 text-xs text-center">
-              {/* Usuário: <span className="text-gray-400">admin</span> | Senha: <span className="text-gray-400">admin123</span> */}
-            </p>
+            <p className="text-gray-500 text-xs text-center"></p>
           </div>
         </div>
       </div>

@@ -6,6 +6,11 @@
   height: 6px;
 }
 
+body {
+  background-color: var(--bg);
+  color: var(--text);
+}
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
@@ -51,4 +56,28 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 /* Body */
 body {
   background-color: #0f0a1e;
+}
+
+:root {
+  --bg: #ffffff;
+  --text: #000000;
+  --primary: #3b82f6;
+}
+
+[data-theme="dark"] {
+  --bg: #0f172a;
+  --text: #ffffff;
+  --primary: #3b82f6;
+}
+
+[data-theme="blue"] {
+  --bg: #0ea5e9;
+  --text: #ffffff;
+  --primary: #0284c7;
+}
+
+[data-theme="pink"] {
+  --bg: #ec4899;
+  --text: #ffffff;
+  --primary: #db2777;
 }
