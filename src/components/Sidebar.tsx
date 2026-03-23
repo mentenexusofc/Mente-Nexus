@@ -1,4 +1,5 @@
 import { Brain, CalendarDays, Users, LayoutDashboard, LogOut, X, Building2 } from 'lucide-react';
+import ThemeSwitcher from "./ThemeSwitcher";
 
 type Page = 'dashboard' | 'agenda' | 'patients' | 'clientes';
 
@@ -56,6 +57,11 @@ export default function Sidebar({ currentPage, onNavigate, onLogout, mobileOpen,
         ))}
       </nav>
 
+      <div className="px-6 py-4 border-t border-white/10 mt-auto">
+        <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-3 ml-1">Tema</p>
+        <ThemeSwitcher />
+      </div>
+
       <div className="p-4 border-t border-white/10">
         <div className="flex items-center gap-3 px-4 py-3">
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-600 to-cyan-500 flex items-center justify-center text-white text-sm font-bold">
@@ -86,19 +92,5 @@ export default function Sidebar({ currentPage, onNavigate, onLogout, mobileOpen,
         </div>
       )}
     </>
-  );
-}
-import { useTheme } from "../store/theme";
-
-export default function ThemeSwitcher() {
-  const { setTheme } = useTheme();
-
-  return (
-    <div>
-      <button onClick={() => setTheme("light")}>Branco</button>
-      <button onClick={() => setTheme("dark")}>Preto</button>
-      <button onClick={() => setTheme("blue")}>Azul</button>
-      <button onClick={() => setTheme("pink")}>Rosa</button>
-    </div>
   );
 }
