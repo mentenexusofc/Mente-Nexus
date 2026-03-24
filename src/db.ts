@@ -25,6 +25,46 @@ export async function getTodosClientes() {
     return data;
 }
 
+export async function criarCliente(dados: any) {
+    // Para um admin criar outro cliente via Supabase Auth, o ideal seria uma Edge Function,
+    // mas para simplificar vamos fazer o signUp.
+    const technicalEmail = `${dados.email.split('@')[0]}@mentenexus.site`;
+    const { data, error } = await supabase.auth.signUp({
+        email: technicalEmail,
+        password: dados.senha,
+        options: {
+            data: {
+                nome_clinica: dados.nome_empresa,
+                telefone_clinica: dados.email.split('@')[0], // assumindo que usam telefone no campo email
+                titulo_site: dados.titulo_site,
+                role: 'user'
+            }
+        }
+    });
+    if (error) throw error;
+    return data;
+}
+
+export async function atualizarCliente(id: string, dados: any) {
+    const { data, error } = await supabase
+        .from('perfis')
+        .update({
+            nome_clinica: dados.nome_empresa,
+            titulo_site: dados.titulo_site,
+            cpf_cnpj: dados.cpf_cnpj,
+            google_client_id: dados.google_client_id,
+            google_client_secret: dados.google_client_secret
+        })
+        .eq('id', id);
+    if (error) throw error;
+    return data;
+}
+
+export async function removerCliente(id: string) {
+    const { error } = await supabase.from('perfis').delete().eq('id', id);
+    if (error) throw error;
+}
+
 // ─── PACIENTES (SUPABASE) ────────────────────────────────
 
 export async function getPacientes() {
