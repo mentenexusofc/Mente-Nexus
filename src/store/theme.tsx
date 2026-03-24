@@ -12,11 +12,10 @@ export const ThemeProvider = ({ children }: any) => {
     }, [theme]);
 
     return (
-        <ThemeContext.Provider value= {{ theme, setTheme }
-}>
-    { children }
-    </ThemeContext.Provider>
-  );
+        <ThemeContext.Provider value={{ theme, setTheme }}>
+            {children}
+        </ThemeContext.Provider>
+    );
 };
 
 export const useTheme = () => useContext(ThemeContext);
