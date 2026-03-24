@@ -1,198 +1,120 @@
 import { supabase } from './supabaseClient'
 
-// URL base da sua API no Coolify
-const API_URL = import.meta.env.VITE_API_URL // ex: https://api.seudominio.com
-
-async function getToken(): Promise<string> {
-    const { data: { session } } = await supabase.auth.getSession()
-    if (!session) throw new Error('Não autenticado')
-    return session.access_token
-}
-
-async function api(path: string, options: RequestInit = {}) {
-    const token = await getToken()
-    const res = await fetch(`${API_URL}${path}`, {
-        ...options,
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-            ...options.headers,
-        },
-    })
-    if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.message || `Erro ${res.status}`)
-    }
-    return res.json()
-}
-
-// ─── PERFIS ──────────────────────────────────────────────
+// ─── PERFIS (SUPABASE) ───────────────────────────────────
 
 export async function getMeuPerfil() {
-    return api('/meu-perfil')
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data, error } = await supabase
+        .from('perfis')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+    if (error) {
+        console.error('Erro ao buscar perfil:', error);
+        return null;
+    }
+    return data;
 }
 
 export async function getTodosClientes() {
-    return api('/clientes')
+    const { data, error } = await supabase.from('perfis').select('*');
+    if (error) throw error;
+    return data;
 }
 
-export async function criarCliente(cliente: {
-    email: string
-    senha: string
-    nome_empresa: string
-    titulo_site: string
-    google_client_id?: string
-    google_client_secret?: string
-    cpf_cnpj?: string
-}) {
-    return api('/clientes', {
-        method: 'POST',
-        body: JSON.stringify(cliente),
-    })
-}
-
-export async function atualizarCliente(id: string, dados: {
-    nome_empresa?: string
-    titulo_site?: string
-    google_client_id?: string
-    google_client_secret?: string
-    cpf_cnpj?: string
-}) {
-    return api(`/clientes/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify(dados),
-    })
-}
-
-export async function removerCliente(id: string) {
-    return api(`/clientes/${id}`, { method: 'DELETE' })
-}
-
-// ─── PACIENTES ───────────────────────────────────────────
+// ─── PACIENTES (SUPABASE) ────────────────────────────────
 
 export async function getPacientes() {
-    return api('/pacientes')
+    const { data, error } = await supabase.from('pacientes').select('*').order('nome');
+    if (error) throw error;
+    return data;
 }
 
-export async function salvarPaciente(paciente: {
-    id?: string
-    nome: string
-    email?: string
-    telefone?: string
-    data_nascimento?: string
-    cpf?: string
-    endereco?: string
-    observacoes?: string
-}) {
+export async function salvarPaciente(paciente: any) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Não autenticado');
+
     if (paciente.id) {
-        return api(`/pacientes/${paciente.id}`, {
-            method: 'PATCH',
-            body: JSON.stringify(paciente),
-        })
+        const { error } = await supabase.from('pacientes').update(paciente).eq('id', paciente.id);
+        if (error) throw error;
+    } else {
+        const { error } = await supabase.from('pacientes').insert({ ...paciente, clinic_id: user.id });
+        if (error) throw error;
     }
-    return api('/pacientes', {
-        method: 'POST',
-        body: JSON.stringify(paciente),
-    })
 }
 
 export async function deletarPaciente(id: string) {
-    return api(`/pacientes/${id}`, { method: 'DELETE' })
+    const { error } = await supabase.from('pacientes').delete().eq('id', id);
+    if (error) throw error;
 }
 
-// ─── CONSULTAS ───────────────────────────────────────────
+// ─── CONSULTAS (SUPABASE) ────────────────────────────────
 
 export async function getConsultas() {
-    return api('/consultas')
+    const { data, error } = await supabase
+        .from('consultas')
+        .select('*, pacientes(nome)')
+        .order('data', { ascending: false });
+    if (error) throw error;
+    return data;
 }
 
-export async function getConsultasPorData(data: string) {
-    return api(`/consultas?data=${data}`)
-}
+export async function salvarConsulta(consulta: any) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Não autenticado');
 
-export async function salvarConsulta(consulta: {
-    id?: string
-    paciente_id: string
-    data: string
-    hora: string
-    duracao_minutos?: number
-    status?: string
-    valor?: number
-}) {
     if (consulta.id) {
-        return api(`/consultas/${consulta.id}`, {
-            method: 'PATCH',
-            body: JSON.stringify(consulta),
-        })
+        const { error } = await supabase.from('consultas').update(consulta).eq('id', consulta.id);
+        if (error) throw error;
+    } else {
+        const { error } = await supabase.from('consultas').insert({ ...consulta, clinic_id: user.id });
+        if (error) throw error;
     }
-    return api('/consultas', {
-        method: 'POST',
-        body: JSON.stringify(consulta),
-    })
 }
 
 export async function deletarConsulta(id: string) {
-    return api(`/consultas/${id}`, { method: 'DELETE' })
+    const { error } = await supabase.from('consultas').delete().eq('id', id);
+    if (error) throw error;
 }
 
-// ─── PRONTUÁRIOS ─────────────────────────────────────────
-
-export async function getProntuario(consultaId: string) {
-    return api(`/prontuarios?consulta_id=${consultaId}`)
-}
-
-export async function salvarProntuario(prontuario: {
-    id?: string
-    consulta_id: string
-    paciente_id: string
-    anotacoes: string
-}) {
-    if (prontuario.id) {
-        return api(`/prontuarios/${prontuario.id}`, {
-            method: 'PATCH',
-            body: JSON.stringify({ anotacoes: prontuario.anotacoes }),
-        })
-    }
-    return api('/prontuarios', {
-        method: 'POST',
-        body: JSON.stringify(prontuario),
-    })
-}
-
-// ─── FINANCEIRO ──────────────────────────────────────────
+// ─── FINANCEIRO (SUPABASE) ───────────────────────────────
 
 export async function getFinanceiro() {
-    return api('/financeiro')
+    const { data, error } = await supabase.from('financeiro').select('*').order('data', { ascending: false });
+    if (error) throw error;
+    return data;
 }
 
-export async function salvarFinanceiro(item: {
-    id?: string
-    descricao: string
-    valor: number
-    tipo: 'receita' | 'despesa'
-    status: 'pendente' | 'pago' | 'cancelado'
-    data: string
-    consulta_id?: string
-    paciente_id?: string
-}) {
+export async function salvarFinanceiro(item: any) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Não autenticado');
+
     if (item.id) {
-        return api(`/financeiro/${item.id}`, {
-            method: 'PATCH',
-            body: JSON.stringify(item),
-        })
+        const { error } = await supabase.from('financeiro').update(item).eq('id', item.id);
+        if (error) throw error;
+    } else {
+        const { error } = await supabase.from('financeiro').insert({ ...item, clinic_id: user.id });
+        if (error) throw error;
     }
-    return api('/financeiro', {
-        method: 'POST',
-        body: JSON.stringify(item),
-    })
 }
 
 export async function deletarFinanceiro(id: string) {
-    return api(`/financeiro/${id}`, { method: 'DELETE' })
+    const { error } = await supabase.from('financeiro').delete().eq('id', id);
+    if (error) throw error;
 }
 
-// ─── RESUMO DASHBOARD ────────────────────────────────────
+// ─── RESUMO DASHBOARD (SUPABASE) ──────────────────────────
 
 export async function getResumoDashboard() {
-    return api('/dashboard/resumo')
+    const { count: totalPacientes } = await supabase.from('pacientes').select('*', { count: 'exact', head: true });
+    const { count: totalConsultas } = await supabase.from('consultas').select('*', { count: 'exact', head: true });
+    
+    return {
+        pacientes: totalPacientes || 0,
+        consultas: totalConsultas || 0,
+        receita_mes: 0,
+    };
 }

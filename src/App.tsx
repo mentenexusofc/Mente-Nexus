@@ -25,7 +25,7 @@ export default function App() {
       if (session) {
         setIsAuthenticated(true)
         setUserEmail(session.user.email || '')
-        const p = await getMeuPerfil(session.access_token)
+        const p = await getMeuPerfil()
         setPerfil(p)
       }
       setLoading(false)
@@ -37,7 +37,7 @@ export default function App() {
         if (event === 'SIGNED_IN' && session) {
           setIsAuthenticated(true)
           setUserEmail(session.user.email || '')
-          const p = await getMeuPerfil(session.access_token)
+          const p = await getMeuPerfil()
           setPerfil(p)
         }
         if (event === 'SIGNED_OUT') {
@@ -95,7 +95,7 @@ export default function App() {
         onLogout={handleLogout}
         mobileOpen={mobileMenuOpen}
         onCloseMobile={() => setMobileMenuOpen(false)}
-        userEmail={userEmail}
+        userEmail={perfil?.telefone_clinica || userEmail.split('@')[0]}
         tituloSite={tituloSite}
         isAdmin={perfil?.role === 'admin'}
       />
