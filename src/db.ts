@@ -3,20 +3,25 @@ import { supabase } from './lib/supabase'
 // ─── PERFIS (SUPABASE) ───────────────────────────────────
 
 export async function getMeuPerfil() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
+    try {
+        const { data: authData, error: authError } = await supabase.auth.getUser();
+        if (authError || !authData?.user) return null;
 
-    const { data, error } = await supabase
-        .from('perfis')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+        const { data, error } = await supabase
+            .from('perfis')
+            .select('*')
+            .eq('id', authData.user.id)
+            .maybeSingle(); // Usando maybeSingle para não disparar erro se não existir
 
-    if (error) {
-        console.error('Erro ao buscar perfil:', error);
+        if (error) {
+            console.error('Erro ao buscar perfil na tabela perfis:', error);
+            return null;
+        }
+        return data;
+    } catch (err) {
+        console.error('Erro crítico em getMeuPerfil:', err);
         return null;
     }
-    return data;
 }
 
 export async function atualizarMeuPerfil(dados: any) {

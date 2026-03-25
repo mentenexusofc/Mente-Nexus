@@ -21,17 +21,30 @@ export default function App() {
 
   useEffect(() => {
     const initSession = async () => {
+      console.log('Iniciando initSession...');
       try {
-        const { data: { session } } = await supabase.auth.getSession()
+        const { data, error: sessionError } = await supabase.auth.getSession()
+        if (sessionError) {
+          console.error('Erro ao buscar sessão:', sessionError)
+        }
+        
+        const session = data?.session;
         if (session) {
+          console.log('Sessão encontrada para:', session.user.email);
           setIsAuthenticated(true)
           setUserEmail(session.user.email || '')
+          
+          console.log('Buscando perfil do usuário...');
           const p = await getMeuPerfil()
+          console.log('Perfil retornado:', p);
           setPerfil(p)
+        } else {
+          console.log('Nenhuma sessão ativa encontrada.');
         }
       } catch (err) {
-        console.error('Erro na sessão inicial:', err)
+        console.error('Erro fatal na sessão inicial:', err)
       } finally {
+        console.log('Finalizando initSession (setLoading=false)');
         setLoading(false)
       }
     }
