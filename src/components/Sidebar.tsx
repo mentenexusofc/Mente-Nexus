@@ -17,8 +17,9 @@ export default function Sidebar({ onLogout, mobileOpen, onCloseMobile, userEmail
     { id: '/', label: 'Dashboard', icon: LayoutDashboard },
     { id: '/agenda', label: 'Agenda', icon: CalendarDays },
     { id: '/patients', label: 'Pacientes', icon: Users },
-    ...(isAdmin ? [{ id: '/admin/clinicas', label: 'Gerenciar Clínicas', icon: Building2 }] : []),
+    ...(isAdmin ? [{ id: '/admin/clinicas', label: 'Gestão de Clientes', icon: Building2 }] : []),
   ];
+
 
   const sidebarContent = (
     <div className="flex flex-col h-full overflow-y-auto">
@@ -80,17 +81,24 @@ export default function Sidebar({ onLogout, mobileOpen, onCloseMobile, userEmail
 
   return (
     <>
-      <aside className="hidden lg:flex w-64 bg-[#0f0a1e]/80 backdrop-blur-xl border-r border-white/5 flex-col fixed inset-y-0 left-0 z-30">
+      <aside 
+        className="hidden lg:flex w-64 glass-effect border-r border-white/5 flex-col fixed inset-y-0 left-0 z-30 transition-colors duration-500"
+        style={{ backgroundColor: 'var(--bg-secondary)', opacity: 0.95 }}
+      >
         {sidebarContent}
       </aside>
       {mobileOpen && (
         <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={onCloseMobile} />
-          <aside className="fixed inset-y-0 left-0 w-64 bg-[#0f0a1e] border-r border-white/5 flex flex-col z-50">
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md" onClick={onCloseMobile} />
+          <aside 
+            className="fixed inset-y-0 left-0 w-64 border-r border-white/5 flex flex-col z-50 transition-colors duration-500"
+            style={{ backgroundColor: 'var(--bg-secondary)' }}
+          >
             {sidebarContent}
           </aside>
         </div>
       )}
+
     </>
   );
 }

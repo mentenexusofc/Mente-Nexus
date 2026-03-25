@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 
-type Theme = "light" | "dark" | "blue" | "pink";
+type Theme = "dark" | "blue" | "pink";
 
 const ThemeContext = createContext<any>(null);
 

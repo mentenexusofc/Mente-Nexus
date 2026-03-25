@@ -133,12 +133,13 @@ export default function AdminClinicas() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-white">Clientes</h1>
-                    <p className="text-gray-400 mt-1">{clientes.length} cliente(s) cadastrado(s)</p>
+                    <h1 className="text-2xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">Gestão de Clientes</h1>
+                    <p className="text-gray-400 mt-1">{clientes.length} cliente(s) ativo(s) no sistema</p>
                 </div>
+
+
                 <button
                     onClick={() => { resetForm(); setShowForm(true) }}
                     className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-medium rounded-xl cursor-pointer text-sm shadow-lg shadow-purple-500/25"

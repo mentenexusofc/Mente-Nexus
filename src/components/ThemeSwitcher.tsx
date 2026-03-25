@@ -14,27 +14,31 @@ export default function ThemeSwitcher() {
   };
 
   const themes = [
-    { id: "dark", color: "bg-[#0f0a1e] border-[#1a1035]", label: "Escuro" },
-    { id: "light", color: "bg-white border-gray-200", label: "Claro" },
-    { id: "blue", color: "bg-sky-500 border-sky-400", label: "Azul" },
-    { id: "pink", color: "bg-pink-500 border-pink-400", label: "Rosa" },
+    { id: "dark", color: "bg-[#0a0514] border-[#120925]", label: "Premium Dark", accent: "from-violet-500 to-purple-600" },
+    { id: "blue", color: "bg-[#020617] border-[#0f172a]", label: "Ocean Blue", accent: "from-sky-500 to-blue-600" },
+    { id: "pink", color: "bg-[#0d020d] border-[#1a051a]", label: "Cyber Pink", accent: "from-pink-500 to-rose-600" },
   ];
 
   return (
-    <div className="flex gap-3">
+    <div className="flex gap-4">
       {themes.map((t) => (
         <button
           key={t.id}
           onClick={() => handleSetTheme(t.id)}
-          className={`w-10 h-10 rounded-xl border-2 transition-all duration-300 cursor-pointer flex items-center justify-center shadow-lg ${t.color} ${
+          className={`group relative w-12 h-12 rounded-2xl border-2 transition-all duration-500 cursor-pointer flex items-center justify-center overflow-hidden ${t.color} ${
             theme === t.id 
-              ? "border-purple-500 ring-2 ring-purple-500/20 scale-110 shadow-purple-500/20" 
-              : "border-white/10 opacity-60 hover:opacity-100 hover:scale-105"
+              ? "border-purple-500 ring-4 ring-purple-500/20 scale-105 shadow-[0_0_20px_rgba(139,92,246,0.2)]" 
+              : "border-white/5 opacity-60 hover:opacity-100 hover:scale-105 hover:border-white/20"
           }`}
           title={t.label}
         >
-          {theme === t.id && (
-            <div className="w-2 h-2 rounded-full bg-purple-500 shadow-[0_0_10px_purple]" />
+          {/* Accent bar at the bottom */}
+          <div className={`absolute inset-0 bg-gradient-to-br ${t.accent} opacity-0 group-hover:opacity-10 transition-opacity duration-500`} />
+          
+          {theme === t.id ? (
+            <div className={`w-3 h-3 rounded-full bg-gradient-to-r ${t.accent} shadow-[0_0_15px_var(--bg-accent)] animate-pulse`} />
+          ) : (
+             <div className="w-1.5 h-1.5 rounded-full bg-white/20 group-hover:bg-white/40 transition-colors" />
           )}
         </button>
       ))}

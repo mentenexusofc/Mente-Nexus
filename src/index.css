@@ -1,68 +1,93 @@
 @import "tailwindcss";
 
-/* 🎨 Variáveis Globais de Cores de Tema */
+/* 🎨 Sistema de Temas Premium Mente Nexus */
 :root {
-  --bg-primary: #0f0a1e;
-  --bg-secondary: #1a1035;
-  --bg-accent: #6366f1; /* purple-500 */
-  --text-main: #ffffff;
-  --text-gray: #9ca3af;
+  --bg-primary: #0a0514;
+  --bg-secondary: #120925;
+  --bg-accent: #8b5cf6; /* violet-500 */
+  --bg-accent-glow: rgba(139, 92, 246, 0.3);
+  --text-main: #f8fafc;
+  --text-gray: #94a3b8;
+  --glass-bg: rgba(255, 255, 255, 0.03);
+  --glass-border: rgba(255, 255, 255, 0.08);
 }
 
-[data-theme="light"] {
-  --bg-primary: #f8fafc;
-  --bg-secondary: #ffffff;
-  --bg-accent: #3b82f6;
-  --text-main: #0f172a;
-  --text-gray: #64748b;
+[data-theme="dark"] {
+  --bg-primary: #0a0514;
+  --bg-secondary: #120925;
+  --bg-accent: #8b5cf6;
+  --bg-accent-glow: rgba(139, 92, 246, 0.3);
 }
 
 [data-theme="blue"] {
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-accent: #0ea5e9;
-  --text-main: #ffffff;
-  --text-gray: #94a3b8;
+  --bg-primary: #020617;
+  --bg-secondary: #0f172a;
+  --bg-accent: #0ea5e9; /* sky-500 */
+  --bg-accent-glow: rgba(14, 165, 233, 0.3);
+  --glass-bg: rgba(14, 165, 233, 0.03);
 }
 
 [data-theme="pink"] {
-  --bg-primary: #1a0a1a;
-  --bg-secondary: #2d0f2d;
-  --bg-accent: #ec4899;
-  --text-main: #ffffff;
-  --text-gray: #d946ef;
+  --bg-primary: #0d020d;
+  --bg-secondary: #1a051a;
+  --bg-accent: #ec4899; /* pink-500 */
+  --bg-accent-glow: rgba(236, 72, 153, 0.3);
+  --glass-bg: rgba(236, 72, 153, 0.03);
 }
 
 body {
   background-color: var(--bg-primary);
   color: var(--text-main);
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
 }
 
-/* Custom scrollbar para todos os temas */
+/* Glassmorphism Utility */
+.glass-effect {
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+}
+
+/* Custom scrollbar Premium */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(0, 0, 0, 0.1);
 }
 ::-webkit-scrollbar-thumb {
   background: var(--bg-accent);
-  opacity: 0.3;
-  border-radius: 3px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px var(--bg-accent-glow);
 }
 
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
+/* Animations */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
 }
 
-/* Date input para temas escuros */
-[data-theme="dark"] input[type="date"]::-webkit-calendar-picker-indicator,
-[data-theme="blue"] input[type="date"]::-webkit-calendar-picker-indicator,
-[data-theme="pink"] input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(1);
-  opacity: 0.5;
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Input Styles */
+input, select, textarea {
+  transition: all 0.2s ease;
+}
+
+input:focus, select:focus, textarea:focus {
+  border-color: var(--bg-accent) !important;
+  box-shadow: 0 0 15px var(--bg-accent-glow) !important;
+}
+
+/* Date input fixing */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) hue-rotate(180deg) brightness(1.5);
+  opacity: 0.6;
   cursor: pointer;
 }
