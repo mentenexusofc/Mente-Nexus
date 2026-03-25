@@ -70,15 +70,21 @@ export default function App() {
   const userIdentifier = perfil?.telefone_clinica || userEmail.split('@')[0]
 
   return (
-    <ThemeProvider>
+    <ThemeProvider initialTheme={perfil?.tema}>
       {loading ? (
-        <div className="min-h-screen bg-gradient-to-br from-[#0f0a1e] via-[#1a1035] to-[#0d1b2a] flex items-center justify-center">
+        <div 
+          className="min-h-screen flex items-center justify-center transition-colors duration-300"
+          style={{ backgroundColor: 'var(--bg-primary)' }}
+        >
           <div className="w-8 h-8 border-2 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
         </div>
       ) : !isAuthenticated ? (
         <LoginPage />
       ) : (
-        <div className="min-h-screen bg-gradient-to-br from-[#0f0a1e] via-[#1a1035] to-[#0d1b2a]">
+        <div 
+          className="min-h-screen transition-colors duration-300"
+          style={{ backgroundColor: 'var(--bg-primary)' }}
+        >
           <Sidebar
             currentPage={currentPage}
             onNavigate={setCurrentPage}
@@ -90,7 +96,10 @@ export default function App() {
             isAdmin={perfil?.role === 'admin'}
           />
           <div className="lg:ml-64">
-            <div className="lg:hidden sticky top-0 z-20 bg-[#0f0a1e]/80 backdrop-blur-xl border-b border-white/5 px-4 py-3 flex items-center gap-3">
+            <div 
+              className="lg:hidden sticky top-0 z-20 backdrop-blur-xl border-b border-white/5 px-4 py-3 flex items-center gap-3 transition-colors duration-300"
+              style={{ backgroundColor: 'var(--bg-primary)' }}
+            >
               <button onClick={() => setMobileMenuOpen(true)} className="p-2 rounded-lg hover:bg-white/10 text-gray-400 cursor-pointer">
                 <Menu className="w-5 h-5" />
               </button>

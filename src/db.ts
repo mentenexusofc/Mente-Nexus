@@ -19,6 +19,18 @@ export async function getMeuPerfil() {
     return data;
 }
 
+export async function atualizarMeuPerfil(dados: any) {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Não autenticado');
+
+    const { data, error } = await supabase
+        .from('perfis')
+        .update(dados)
+        .eq('id', user.id);
+    if (error) throw error;
+    return data;
+}
+
 export async function getTodosClientes() {
     const { data, error } = await supabase.from('perfis').select('*');
     if (error) throw error;

@@ -24,20 +24,28 @@ export default function LoginPage() {
     setSuccess('');
     setLoading(true);
 
-    const email = getAuthEmail(phone);
+    // Detectar se é email (admin) ou telefone (clínica)
+    const isEmail = phone.includes('@');
+    const authEmail = isEmail ? phone : getAuthEmail(phone);
 
     if (isLogin) {
       const { error } = await supabase.auth.signInWithPassword({
-        email,
+        email: authEmail,
         password,
       });
 
       if (error) {
-        setError('Telefone ou senha incorretos');
+        setError(isEmail ? 'E-mail ou senha incorretos' : 'Telefone ou senha incorretos');
         setLoading(false);
       }
     } else {
-      // Cadastro de nova conta
+      // Cadastro de nova conta (apenas para clínicas via telefone)
+      if (isEmail) {
+        setError('O cadastro direto é apenas para clínicas. Contate o administrador.');
+        setLoading(false);
+        return;
+      }
+      
       if (!nomeClinica) {
         setError('Por favor, informe o nome da clínica');
         setLoading(false);
@@ -45,7 +53,7 @@ export default function LoginPage() {
       }
 
       const { error, data } = await supabase.auth.signUp({
-        email,
+        email: authEmail,
         password,
         options: {
           data: {
@@ -68,12 +76,20 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#0f0a1e] via-[#1a1035] to-[#0d1b2a] flex items-center justify-center p-4 relative overflow-hidden">
+    <div 
+      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden transition-colors duration-300"
+      style={{ backgroundColor: 'var(--bg-primary)' }}
+    >
       {/* Elementos visuais de fundo */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-600/10 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-600/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-600/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
+        <div 
+          className="absolute -top-40 -right-40 w-80 h-80 rounded-full blur-3xl animate-pulse opacity-20" 
+          style={{ backgroundColor: 'var(--bg-accent)' }}
+        />
+        <div 
+          className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full blur-3xl animate-pulse opacity-20" 
+          style={{ backgroundColor: 'var(--bg-accent)', animationDelay: '1s' }} 
+        />
         <div className="absolute inset-0 opacity-[0.03]" style={{
           backgroundImage: 'linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px)',
           backgroundSize: '50px 50px'
@@ -82,7 +98,10 @@ export default function LoginPage() {
 
       <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-600 to-cyan-500 mb-4 shadow-lg shadow-purple-500/25">
+          <div 
+            className="inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-4 shadow-lg transition-colors"
+            style={{ background: 'linear-gradient(135deg, var(--bg-accent), #8b5cf6)' }}
+          >
             <Brain className="w-10 h-10 text-white" />
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 via-cyan-400 to-purple-400 bg-clip-text text-transparent">
@@ -112,13 +131,13 @@ export default function LoginPage() {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">WhatsApp / Telefone</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">WhatsApp ou E-mail</label>
               <input
-                type="tel"
+                type="text"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all"
-                placeholder="Ex: 11999999999"
+                placeholder="Telefone ou Admin E-mail"
                 required
               />
             </div>

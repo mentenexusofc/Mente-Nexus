@@ -4,8 +4,14 @@ type Theme = "light" | "dark" | "blue" | "pink";
 
 const ThemeContext = createContext<any>(null);
 
-export const ThemeProvider = ({ children }: any) => {
-    const [theme, setTheme] = useState<Theme>("light");
+export const ThemeProvider = ({ children, initialTheme }: any) => {
+    const [theme, setTheme] = useState<Theme>("dark");
+
+    useEffect(() => {
+        if (initialTheme) {
+            setTheme(initialTheme);
+        }
+    }, [initialTheme]);
 
     useEffect(() => {
         document.documentElement.setAttribute("data-theme", theme);
