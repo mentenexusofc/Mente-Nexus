@@ -5,45 +5,56 @@ export function useAuth() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchProfile = async (sessionUser: any) => {
+    try {
+      const { data: perfil, error } = await supabase
+        .from("perfis")
+        .select("email, telefone, role")
+        .eq("id", sessionUser.id)
+        .single();
+
+      if (error) {
+        console.error("Erro ao buscar perfil:", error);
+      }
+
+      setUser({
+        ...sessionUser,
+        perfil,
+        role: perfil?.role || "user",
+      });
+    } catch (err) {
+      console.error("Erro na atualização do usuário:", err);
+      setUser({ ...sessionUser, role: "user" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    // Busca usuário inicial
-    const fetchInitialUser = async () => {
+    const initSession = async () => {
+      console.log("Iniciando initSession...");
       try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session && session.user) {
-          const { data } = await supabase
-            .from("perfis")
-            .select("role")
-            .eq("id", session.user.id)
-            .single();
-          setUser({ ...session.user, role: data?.role || "user" });
+        const { data: { user: sessionUser } } = await supabase.auth.getUser();
+        if (sessionUser) {
+          await fetchProfile(sessionUser);
+        } else {
+          setUser(null);
+          setLoading(false);
         }
       } catch (err) {
-        console.error("Erro ao buscar sessão inicial:", err);
-      } finally {
+        console.error("Erro ao inicializar sessão:", err);
         setLoading(false);
       }
     };
 
-    fetchInitialUser();
+    initSession();
 
-    // Escuta mudanças de sessão
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        try {
-          if (session) {
-            const { data } = await supabase
-              .from("perfis")
-              .select("role")
-              .eq("id", session.user.id)
-              .single();
-            setUser({ ...session.user, role: data?.role || "user" });
-          } else {
-            setUser(null);
-          }
-        } catch (err) {
-          console.error("Erro na mudança de auth:", err);
-        } finally {
+        if (session?.user) {
+          await fetchProfile(session.user);
+        } else {
+          setUser(null);
           setLoading(false);
         }
       }
