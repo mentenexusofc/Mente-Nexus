@@ -1,11 +1,8 @@
 import { Brain, CalendarDays, Users, LayoutDashboard, LogOut, X, Building2 } from 'lucide-react';
+import { NavLink } from 'react-router-dom';
 import ThemeSwitcher from "./ThemeSwitcher";
 
-type Page = 'dashboard' | 'agenda' | 'patients' | 'clientes';
-
 interface Props {
-  currentPage: string;
-  onNavigate: (page: any) => void;
   onLogout: () => void;
   mobileOpen: boolean;
   onCloseMobile: () => void;
@@ -14,17 +11,17 @@ interface Props {
   isAdmin?: boolean;
 }
 
-export default function Sidebar({ currentPage, onNavigate, onLogout, mobileOpen, onCloseMobile, userEmail, tituloSite, isAdmin }: Props) {
+export default function Sidebar({ onLogout, mobileOpen, onCloseMobile, userEmail, tituloSite, isAdmin }: Props) {
 
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'agenda', label: 'Agenda', icon: CalendarDays },
-    { id: 'patients', label: 'Pacientes', icon: Users },
-    ...(isAdmin ? [{ id: 'clientes', label: 'Clientes', icon: Building2 }] : []),
+    { id: '/', label: 'Dashboard', icon: LayoutDashboard },
+    { id: '/agenda', label: 'Agenda', icon: CalendarDays },
+    { id: '/patients', label: 'Pacientes', icon: Users },
+    ...(isAdmin ? [{ id: '/admin/clinicas', label: 'Gerenciar Clínicas', icon: Building2 }] : []),
   ];
 
   const sidebarContent = (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full overflow-y-auto">
       <div className="p-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-cyan-500 flex items-center justify-center shadow-lg shadow-purple-500/25">
@@ -43,17 +40,20 @@ export default function Sidebar({ currentPage, onNavigate, onLogout, mobileOpen,
 
       <nav className="flex-1 px-4 space-y-1 mt-4">
         {navItems.map(item => (
-          <button
+          <NavLink
             key={item.id}
-            onClick={() => { onNavigate(item.id); onCloseMobile(); }}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${currentPage === item.id
-              ? 'bg-gradient-to-r from-purple-600/20 to-cyan-600/20 text-white border border-purple-500/20'
-              : 'text-gray-400 hover:text-white hover:bg-white/5'
-              }`}
+            to={item.id}
+            onClick={onCloseMobile}
+            className={({ isActive }) => 
+              `w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${isActive
+                ? 'bg-gradient-to-r from-purple-600/20 to-cyan-600/20 text-white border border-purple-500/20'
+                : 'text-gray-400 hover:text-white hover:bg-white/5'
+              }`
+            }
           >
             <item.icon className="w-5 h-5" />
             {item.label}
-          </button>
+          </NavLink>
         ))}
       </nav>
 

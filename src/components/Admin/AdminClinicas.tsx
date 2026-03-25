@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { Plus, Trash2, Edit3, X, Eye, EyeOff, AlertTriangle, Shield, ExternalLink, Copy, Check } from 'lucide-react'
-import { getTodosClientes, criarCliente, atualizarCliente, removerCliente } from '../db'
+import { getTodosClientes, criarCliente, atualizarCliente, removerCliente } from '../../db'
+import { supabase } from '../../lib/supabase'
 
-export default function Clientes() {
+export default function AdminClinicas() {
     const [clientes, setClientes] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [showForm, setShowForm] = useState(false)

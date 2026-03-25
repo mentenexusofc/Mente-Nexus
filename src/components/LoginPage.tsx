@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Brain, Eye, EyeOff, LogIn, UserPlus } from 'lucide-react';
-import { supabase } from '../supabaseClient';
+import { supabase } from '../lib/supabase';
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);

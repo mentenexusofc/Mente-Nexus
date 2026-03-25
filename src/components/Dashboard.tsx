@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Users, CalendarDays, DollarSign, Clock, TrendingUp, Activity } from 'lucide-react';
 import { getResumoDashboard, getConsultas, getPacientes } from '../db';
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-interface Props {
-  onNavigate: (page: 'agenda' | 'patients') => void;
-}
-
-export default function Dashboard({ onNavigate }: Props) {
+export default function Dashboard() {
+  const navigate = useNavigate();
   const [resumo, setResumo] = useState({ totalPacientes: 0, consultasHoje: 0, agendadas: 0, receitaMes: 0 });
   const [proximas, setProximas] = useState<any[]>([]);
   const [concluidas, setConcluidas] = useState<any[]>([]);
@@ -100,7 +98,7 @@ export default function Dashboard({ onNavigate }: Props) {
               <TrendingUp className="w-5 h-5 text-cyan-400" />
               <h2 className="text-lg font-semibold text-white">Próximas Consultas</h2>
             </div>
-            <button onClick={() => onNavigate('agenda')} className="text-sm text-purple-400 hover:text-purple-300 cursor-pointer">
+            <button onClick={() => navigate('/agenda')} className="text-sm text-purple-400 hover:text-purple-300 cursor-pointer">
               Ver agenda →
             </button>
           </div>
@@ -135,7 +133,7 @@ export default function Dashboard({ onNavigate }: Props) {
               <Activity className="w-5 h-5 text-emerald-400" />
               <h2 className="text-lg font-semibold text-white">Consultas Concluídas</h2>
             </div>
-            <button onClick={() => onNavigate('patients')} className="text-sm text-purple-400 hover:text-purple-300 cursor-pointer">
+            <button onClick={() => navigate('/patients')} className="text-sm text-purple-400 hover:text-purple-300 cursor-pointer">
               Ver pacientes →
             </button>
           </div>
