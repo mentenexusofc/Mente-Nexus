@@ -21,28 +21,40 @@ export default function App() {
   const [perfil, setPerfil] = useState<any>(null)
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session) {
-        setIsAuthenticated(true)
-        setUserEmail(session.user.email || '')
-        const p = await getMeuPerfil()
-        setPerfil(p)
-      }
-      setLoading(false)
-    })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN' && session) {
+    const initSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session) {
           setIsAuthenticated(true)
           setUserEmail(session.user.email || '')
           const p = await getMeuPerfil()
           setPerfil(p)
         }
-        if (event === 'SIGNED_OUT') {
-          setIsAuthenticated(false)
-          setUserEmail('')
-          setPerfil(null)
+      } catch (err) {
+        console.error('Erro na sessão inicial:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    initSession()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        try {
+          if (event === 'SIGNED_IN' && session) {
+            setIsAuthenticated(true)
+            setUserEmail(session.user.email || '')
+            const p = await getMeuPerfil()
+            setPerfil(p)
+          }
+          if (event === 'SIGNED_OUT') {
+            setIsAuthenticated(false)
+            setUserEmail('')
+            setPerfil(null)
+          }
+        } catch (err) {
+          console.error('Erro na mudança de auth:', err)
         }
       }
     )
