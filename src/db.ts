@@ -162,11 +162,20 @@ export async function deletarFinanceiro(id: string) {
 
 export async function getResumoDashboard() {
     const { count: totalPacientes } = await supabase.from('pacientes').select('*', { count: 'exact', head: true });
-    const { count: totalConsultas } = await supabase.from('consultas').select('*', { count: 'exact', head: true });
+    
+    const hoje = new Date().toISOString().split('T')[0];
+    const { count: consultasHoje } = await supabase.from('consultas')
+        .select('*', { count: 'exact', head: true })
+        .eq('data', hoje);
+
+    const { count: agendadas } = await supabase.from('consultas')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'agendada');
     
     return {
-        pacientes: totalPacientes || 0,
-        consultas: totalConsultas || 0,
-        receita_mes: 0,
+        totalPacientes: totalPacientes || 0,
+        consultasHoje: consultasHoje || 0,
+        agendadas: agendadas || 0,
+        receitaMes: 0,
     };
 }

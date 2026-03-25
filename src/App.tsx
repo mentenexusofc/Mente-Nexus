@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { Menu } from 'lucide-react'
 import LoginPage from './components/LoginPage'
 import Sidebar from './components/Sidebar'
@@ -115,7 +115,7 @@ export default function App() {
 
               <main className="p-4 sm:p-6 lg:p-8">
                 <Routes>
-                  <Route path="/" element={<Dashboard onNavigate={() => {}} />} />
+                  <Route path="/" element={<Dashboard />} />
                   <Route path="/agenda" element={<Agenda />} />
                   <Route path="/patients" element={<Patients />} />
                   <Route 
