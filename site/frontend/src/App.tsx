@@ -28,21 +28,10 @@ interface Cliente {
   ultima?: string;
 }
 
-interface Agendamento {
-  id: number;
-  cliente_id: number;
-  cliente_nome: string;
-  cliente_telefone: string;
-  data_hora: string;
-  status: string;
-  observacoes?: string;
-}
-
 const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [clientes, setClientes] = useState<Cliente[]>([]);
-  const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
