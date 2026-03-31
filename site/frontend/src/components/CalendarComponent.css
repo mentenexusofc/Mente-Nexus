@@ -1,0 +1,75 @@
+.calendar-wrapper {
+  background: rgba(255, 255, 255, 0.05) !important;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 20px;
+  color: white;
+}
+
+.rbc-calendar {
+  color: white !important;
+  font-family: inherit;
+}
+
+.rbc-header {
+  border-bottom: 2px solid rgba(255, 255, 255, 0.1) !important;
+  padding: 10px 0 !important;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.rbc-month-view {
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.rbc-day-bg {
+  border-left: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.rbc-off-range-bg {
+  background: rgba(0, 0, 0, 0.2) !important;
+}
+
+.rbc-today {
+  background: rgba(59, 130, 246, 0.1) !important;
+}
+
+.rbc-toolbar button {
+  color: white !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 8px !important;
+  padding: 5px 15px !important;
+  margin: 0 5px !important;
+  cursor: pointer;
+}
+
+.rbc-toolbar button:hover {
+  background: var(--accent-color) !important;
+  color: black !important;
+}
+
+.rbc-toolbar button.rbc-active {
+  background: var(--accent-color) !important;
+  color: black !important;
+  box-shadow: none !important;
+}
+
+.rbc-event {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+  transition: transform 0.2s;
+}
+
+.rbc-event:hover {
+  transform: scale(1.02);
+}
+
+/* Custom scrollbar for agenda/week views */
+.rbc-time-content::-webkit-scrollbar {
+  width: 6px;
+}
+.rbc-time-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
