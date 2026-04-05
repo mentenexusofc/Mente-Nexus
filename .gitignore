@@ -27,3 +27,4 @@ n8n/
 site_payload.tar.gz
 test.txt
 docker-compose.yml
+.opencode/
