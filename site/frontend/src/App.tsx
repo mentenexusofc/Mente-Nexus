@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   LayoutDashboard, 
   Calendar, 
@@ -10,7 +10,10 @@ import {
   Bell,
   Clock,
   Loader2,
-  LogOut
+  LogOut,
+  X,
+  UserPlus,
+  Check
 } from 'lucide-react';
 import './App.css';
 import CalendarComponent from './components/CalendarComponent';
@@ -35,18 +38,54 @@ interface Agendamento {
   status: string;
 }
 
+interface Profissional {
+  id: number;
+  nome: string;
+  especialidade?: string;
+}
+
+interface Notificacao {
+  id: number;
+  titulo: string;
+  mensagem: string;
+  lida: boolean;
+  data: string;
+}
+
 const App: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>([]);
+  const [profissionais, setProfissionais] = useState<Profissional[]>([]);
   const [loading, setLoading] = useState(false);
+  const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
+  const [showNotificacoes, setShowNotificacoes] = useState(false);
+  const [showModalNovoHorario, setShowModalNovoHorario] = useState(false);
+  const [showModalNovoCliente, setShowModalNovoCliente] = useState(false);
+  const [clienteFilter, setClienteFilter] = useState('');
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  const [novoHorario, setNovoHorario] = useState({ cliente_id: '', profissional_id: '', data_hora: '', status: 'pendente', observacoes: '' });
+  const [novoCliente, setNovoCliente] = useState({ nome: '', telefone: '', email: '' });
 
   useEffect(() => {
     if (isLoggedIn) {
       fetchData();
+      fetchProfissionais();
+      loadNotificacoes();
     }
   }, [isLoggedIn, activeTab]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setShowNotificacoes(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -66,6 +105,87 @@ const App: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const fetchProfissionais = async () => {
+    try {
+      const res = await fetch(`${API_URL}/profissionais`, { headers: { 'X-Clinica-ID': CLINICA_ID } });
+      const data = await res.json();
+      setProfissionais(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Erro ao buscar profissionais:', error);
+    }
+  };
+
+  const loadNotificacoes = () => {
+    const pendentes = agendamentos.filter(a => a.status === 'pendente').length;
+    const hoje = new Date();
+    const hojeAgendamentos = agendamentos.filter(a => {
+      const d = new Date(a.data_hora);
+      return d.toDateString() === hoje.toDateString();
+    });
+    const notifs: Notificacao[] = [
+      { id: 1, titulo: 'Agendamentos pendentes', mensagem: `${pendentes} agendamento(s) aguardando confirmação`, lida: false, data: new Date().toISOString() },
+      ...hojeAgendamentos.slice(0, 3).map((a, i) => ({
+        id: i + 2,
+        titulo: `Consulta hoje: ${a.cliente_nome}`,
+        mensagem: `Horário: ${new Date(a.data_hora).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+        lida: false,
+        data: new Date().toISOString()
+      }))
+    ];
+    setNotificacoes(notifs);
+  };
+
+  const marcarNotificacaoLida = (id: number) => {
+    setNotificacoes(prev => prev.map(n => n.id === id ? { ...n, lida: true } : n));
+  };
+
+  const marcarTodasLidas = () => {
+    setNotificacoes(prev => prev.map(n => ({ ...n, lida: true })));
+  };
+
+  const naoLidas = notificacoes.filter(n => !n.lida).length;
+
+  const handleCriarHorario = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_URL}/agendamentos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Clinica-ID': CLINICA_ID },
+        body: JSON.stringify(novoHorario)
+      });
+      if (res.ok) {
+        setShowModalNovoHorario(false);
+        setNovoHorario({ cliente_id: '', profissional_id: '', data_hora: '', status: 'pendente', observacoes: '' });
+        fetchData();
+        loadNotificacoes();
+      }
+    } catch (error) {
+      console.error('Erro ao criar agendamento:', error);
+    }
+  };
+
+  const handleCriarCliente = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await fetch(`${API_URL}/clientes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Clinica-ID': CLINICA_ID },
+        body: JSON.stringify(novoCliente)
+      });
+      if (res.ok) {
+        setShowModalNovoCliente(false);
+        setNovoCliente({ nome: '', telefone: '', email: '' });
+        fetchData();
+      }
+    } catch (error) {
+      console.error('Erro ao criar cliente:', error);
+    }
+  };
+
+  const clientesFiltrados = clientes.filter(c => 
+    c.nome.toLowerCase().includes(clienteFilter.toLowerCase())
+  );
 
   const dashboardData = () => {
     const hojeStart = new Date();
@@ -129,7 +249,7 @@ const App: React.FC = () => {
                 <h2>Agenda de Atendimentos</h2>
                 <p style={{ color: 'var(--text-secondary)' }}>Gerencie horÃ¡rios e profissionais.</p>
               </div>
-              <button className="nav-item active" style={{ padding: '0.8rem 1.5rem' }}>
+              <button className="nav-item active" style={{ padding: '0.8rem 1.5rem' }} onClick={() => setShowModalNovoHorario(true)}>
                 <Plus size={20}/> Novo HorÃ¡rio
               </button>
             </div>
@@ -141,9 +261,14 @@ const App: React.FC = () => {
           <div className="glass-card animate-fade-in">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
               <h2>GestÃ£o de Clientes</h2>
-              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '8px 16px', alignItems: 'center', gap: '12px' }}>
-                <Search size={18} color="var(--text-secondary)"/>
-                <input type="text" placeholder="Filtrar por nome..." style={{ background: 'none', border: 'none', color: 'white', outline: 'none', width: '200px' }} />
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                <div style={{ display: 'flex', background: 'rgba(255,255,255,0.05)', borderRadius: '12px', padding: '8px 16px', alignItems: 'center', gap: '12px' }}>
+                  <Search size={18} color="var(--text-secondary)"/>
+                  <input type="text" placeholder="Filtrar por nome..." value={clienteFilter} onChange={(e) => setClienteFilter(e.target.value)} style={{ background: 'none', border: 'none', color: 'white', outline: 'none', width: '200px' }} />
+                </div>
+                <button className="nav-item active" style={{ padding: '0.8rem 1.5rem' }} onClick={() => setShowModalNovoCliente(true)}>
+                  <UserPlus size={20}/> Novo Cliente
+                </button>
               </div>
             </div>
             <table>
@@ -157,7 +282,7 @@ const App: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {clientes.map(c => (
+                {clientesFiltrados.map(c => (
                   <tr key={c.id}>
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -173,7 +298,7 @@ const App: React.FC = () => {
                     <td><MoreHorizontal size={20} cursor="pointer" color="var(--text-secondary)"/></td>
                   </tr>
                 ))}
-                {clientes.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: '3rem' }}>Nenhum cliente disponÃ­vel.</td></tr>}
+                {clientesFiltrados.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', padding: '3rem' }}>Nenhum cliente disponÃ­vel.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -232,6 +357,129 @@ const App: React.FC = () => {
         </header>
 
         {renderContent()}
+
+      {showModalNovoHorario && (
+        <div className="modal-overlay" onClick={() => setShowModalNovoHorario(false)}>
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2>Novo Horário</h2>
+              <button className="modal-close" onClick={() => setShowModalNovoHorario(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleCriarHorario}>
+              <div className="form-group">
+                <label>Cliente</label>
+                <select 
+                  value={novoHorario.cliente_id} 
+                  onChange={e => setNovoHorario({ ...novoHorario, cliente_id: e.target.value })}
+                  required
+                >
+                  <option value="">Selecione um cliente</option>
+                  {clientes.map(c => (
+                    <option key={c.id} value={c.id}>{c.nome}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Profissional</label>
+                <select 
+                  value={novoHorario.profissional_id} 
+                  onChange={e => setNovoHorario({ ...novoHorario, profissional_id: e.target.value })}
+                  required
+                >
+                  <option value="">Selecione um profissional</option>
+                  {profissionais.map(p => (
+                    <option key={p.id} value={p.id}>{p.nome} {p.especialidade ? `(${p.especialidade})` : ''}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Data e Hora</label>
+                <input 
+                  type="datetime-local" 
+                  value={novoHorario.data_hora} 
+                  onChange={e => setNovoHorario({ ...novoHorario, data_hora: e.target.value })}
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label>Status</label>
+                <select 
+                  value={novoHorario.status} 
+                  onChange={e => setNovoHorario({ ...novoHorario, status: e.target.value })}
+                >
+                  <option value="pendente">Pendente</option>
+                  <option value="confirmado">Confirmado</option>
+                  <option value="cancelado">Cancelado</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>Observações</label>
+                <textarea 
+                  value={novoHorario.observacoes} 
+                  onChange={e => setNovoHorario({ ...novoHorario, observacoes: e.target.value })}
+                  rows={3}
+                  placeholder="Observações adicionais..."
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn-cancel" onClick={() => setShowModalNovoHorario(false)}>Cancelar</button>
+                <button type="submit" className="btn-primary"><Plus size={18} /> Criar Horário</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showModalNovoCliente && (
+        <div className="modal-overlay" onClick={() => setShowModalNovoCliente(false)}>
+          <div className="modal-content glass-card" onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+              <h2>Novo Cliente</h2>
+              <button className="modal-close" onClick={() => setShowModalNovoCliente(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleCriarCliente}>
+              <div className="form-group">
+                <label>Nome</label>
+                <input 
+                  type="text" 
+                  value={novoCliente.nome} 
+                  onChange={e => setNovoCliente({ ...novoCliente, nome: e.target.value })}
+                  required
+                  placeholder="Nome completo"
+                />
+              </div>
+              <div className="form-group">
+                <label>Telefone / WhatsApp</label>
+                <input 
+                  type="tel" 
+                  value={novoCliente.telefone} 
+                  onChange={e => setNovoCliente({ ...novoCliente, telefone: e.target.value })}
+                  required
+                  placeholder="(00) 00000-0000"
+                />
+              </div>
+              <div className="form-group">
+                <label>E-mail</label>
+                <input 
+                  type="email" 
+                  value={novoCliente.email} 
+                  onChange={e => setNovoCliente({ ...novoCliente, email: e.target.value })}
+                  placeholder="email@exemplo.com"
+                />
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="btn-cancel" onClick={() => setShowModalNovoCliente(false)}>Cancelar</button>
+                <button type="submit" className="btn-primary"><UserPlus size={18} /> Criar Cliente</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       </main>
     </div>
   );
