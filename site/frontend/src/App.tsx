@@ -10,8 +10,7 @@ import {
   Bell,
   Clock,
   Loader2,
-  LogOut,
-  ChevronRight
+  LogOut
 } from 'lucide-react';
 import './App.css';
 import CalendarComponent from './components/CalendarComponent';
