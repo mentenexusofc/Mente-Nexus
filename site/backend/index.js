@@ -8,12 +8,18 @@ const PORT = process.env.PORT || 3001;
 
 // Configuração do Banco de Dados usando DATABASE_URL do .env
 // NOTA: Para conexões remotas, tente SSL primeiro. Se falhar, ajuste conforme necessário.
+// Configuração do Banco de Dados
+const databaseUrl = process.env.DATABASE_URL || '';
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL.includes('localhost') || process.env.DATABASE_URL.includes('127.0.0.1') 
+  connectionString: databaseUrl,
+  ssl: databaseUrl.includes('localhost') || databaseUrl.includes('127.0.0.1') || databaseUrl === ''
     ? false 
     : { rejectUnauthorized: false }
 });
+
+if (!process.env.DATABASE_URL) {
+  console.error('❌ CRÍTICO: DATABASE_URL não encontrada no ambiente!');
+}
 
 const allowedOrigins = [
   'https://ia.mentenexus.tech',
