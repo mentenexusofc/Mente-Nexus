@@ -10,7 +10,9 @@ const PORT = process.env.PORT || 3001;
 // NOTA: Para conexões remotas, tente SSL primeiro. Se falhar, ajuste conforme necessário.
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  ssl: process.env.DATABASE_URL.includes('localhost') || process.env.DATABASE_URL.includes('127.0.0.1') 
+    ? false 
+    : { rejectUnauthorized: false }
 });
 
 const allowedOrigins = [
@@ -63,7 +65,10 @@ app.get('/clinicas', async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Erro interno desconhecido',
+      details: error.code || null
+    });
   }
 });
 
@@ -79,7 +84,10 @@ app.post('/clinicas', async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Erro interno desconhecido',
+      details: error.code || null
+    });
   }
 });
 
@@ -91,7 +99,10 @@ app.delete('/clinicas/:id', async (req, res) => {
     res.json({ message: 'Clínica excluída com sucesso' });
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Erro interno desconhecido',
+      details: error.code || null
+    });
   }
 });
 
@@ -148,7 +159,10 @@ app.get('/clientes/busca/:telefone', validateClinicaHeader, async (req, res) => 
     res.json(result.rows[0]);
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Erro interno desconhecido',
+      details: error.code || null
+    });
   }
 });
 
@@ -162,7 +176,10 @@ app.get('/clientes', validateClinicaHeader, async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Erro interno desconhecido',
+      details: error.code || null
+    });
   }
 });
 
@@ -190,7 +207,10 @@ app.post('/clientes', validateClinicaHeader, async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Erro interno desconhecido',
+      details: error.code || null
+    });
   }
 });
 
@@ -208,7 +228,10 @@ app.put('/clientes/:id', validateClinicaHeader, async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Erro interno desconhecido',
+      details: error.code || null
+    });
   }
 });
 
@@ -220,7 +243,10 @@ app.delete('/clientes/:id', validateClinicaHeader, async (req, res) => {
     res.json({ message: 'Cliente excluído com sucesso' });
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Erro interno desconhecido',
+      details: error.code || null
+    });
   }
 });
 
@@ -236,7 +262,10 @@ app.get('/profissionais', validateClinicaHeader, async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Erro interno desconhecido',
+      details: error.code || null
+    });
   }
 });
 
@@ -252,7 +281,10 @@ app.post('/profissionais', validateClinicaHeader, async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Erro interno desconhecido',
+      details: error.code || null
+    });
   }
 });
 
@@ -269,7 +301,10 @@ app.put('/profissionais/:id', validateClinicaHeader, async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Erro interno desconhecido',
+      details: error.code || null
+    });
   }
 });
 
@@ -281,7 +316,10 @@ app.delete('/profissionais/:id', validateClinicaHeader, async (req, res) => {
     res.json({ message: 'Profissional excluído com sucesso' });
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Erro interno desconhecido',
+      details: error.code || null
+    });
   }
 });
 
@@ -308,7 +346,10 @@ app.get('/disponibilidade', validateClinicaHeader, async (req, res) => {
     res.json({ livres, ocupados });
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Erro interno desconhecido',
+      details: error.code || null
+    });
   }
 });
 
@@ -329,7 +370,10 @@ app.get('/agendamentos', validateClinicaHeader, async (req, res) => {
     res.json(result.rows);
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Erro interno desconhecido',
+      details: error.code || null
+    });
   }
 });
 
@@ -351,7 +395,10 @@ app.post('/agendamentos', validateClinicaHeader, async (req, res) => {
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Erro interno desconhecido',
+      details: error.code || null
+    });
   }
 });
 
@@ -372,7 +419,10 @@ app.put('/agendamentos/:id', validateClinicaHeader, async (req, res) => {
     res.json(result.rows[0]);
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Erro interno desconhecido',
+      details: error.code || null
+    });
   }
 });
 
@@ -390,7 +440,10 @@ app.delete('/agendamentos/:id', validateClinicaHeader, async (req, res) => {
     res.json({ message: 'Agendamento excluído com sucesso' });
   } catch (error) {
     console.error('SERVER ERROR:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ 
+      error: error.message || 'Erro interno desconhecido',
+      details: error.code || null
+    });
   }
 });
 
