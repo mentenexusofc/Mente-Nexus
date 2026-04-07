@@ -6,6 +6,8 @@ async function check() {
   try {
     const resClin = await pool.query('SELECT * FROM clinicas');
     console.log('CLINICAS:', resClin.rows);
+    const resCli = await pool.query('SELECT * FROM clientes');
+    console.log('CLIENTES:', resCli.rows);
     const resAgend = await pool.query('SELECT * FROM agendamentos');
     console.log('AGENDAMENTOS:', resAgend.rows);
   } catch (err) {

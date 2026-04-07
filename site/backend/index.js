@@ -40,7 +40,8 @@ const validateClinicaHeader = (req, res, next) => {
   if (!clinicaId) {
     return res.status(401).json({ error: 'X-Clinica-ID header é obrigatório' });
   }
-  req.clinica_id = clinicaId;
+  // Normalizar: remover tudo que não for número
+  req.clinica_id = clinicaId.toString().replace(/\D/g, '');
   next();
 };
 
@@ -107,12 +108,14 @@ app.post('/webhook/n8n', async (req, res) => {
   }
 
   try {
+    const cleanClinicaId = clinica_id.toString().replace(/\D/g, '');
     await pool.query(`
       INSERT INTO clinicas (id, nome)
       VALUES ($1, $2)
       ON CONFLICT (id) DO NOTHING;
-    `, [clinica_id, clinica_nome || 'Clínica Nova']);
+    `, [cleanClinicaId, clinica_nome || 'Clínica Nova']);
 
+    const cleanTelefone = telefone.toString().replace(/\D/g, '');
     const query = `
       INSERT INTO clientes (clinica_id, nome, telefone, email)
       VALUES ($1, $2, $3, $4)
@@ -120,7 +123,7 @@ app.post('/webhook/n8n', async (req, res) => {
       SET nome = EXCLUDED.nome, email = EXCLUDED.email
       RETURNING *;
     `;
-    const result = await pool.query(query, [clinica_id, nome, telefone, email]);
+    const result = await pool.query(query, [cleanClinicaId, nome, cleanTelefone, email]);
     
     res.status(201).json({ 
       message: 'Cliente processado com sucesso',
@@ -135,10 +138,11 @@ app.post('/webhook/n8n', async (req, res) => {
 // Buscar cliente por telefone
 app.get('/api/clientes/busca/:telefone', validateClinicaHeader, async (req, res) => {
   const { telefone } = req.params;
+  const cleanTelefone = telefone.toString().replace(/\D/g, '');
   try {
     const result = await pool.query(
       'SELECT * FROM clientes WHERE clinica_id = $1 AND telefone = $2',
-      [req.clinica_id, telefone]
+      [req.clinica_id, cleanTelefone]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: 'Não encontrado' });
     res.json(result.rows[0]);
@@ -168,13 +172,21 @@ app.post('/api/clientes', validateClinicaHeader, async (req, res) => {
   if (!nome || !telefone) return res.status(400).json({ error: 'Nome e telefone são obrigatórios' });
 
   try {
+    // Garantir que a clínica existe (mesmo se criada via header manualmente)
+    await pool.query(`
+      INSERT INTO clinicas (id, nome)
+      VALUES ($1, $2)
+      ON CONFLICT (id) DO NOTHING;
+    `, [req.clinica_id, 'Clínica ' + req.clinica_id]);
+
+    const cleanTelefone = telefone.toString().replace(/\D/g, '');
     const result = await pool.query(`
       INSERT INTO clientes (clinica_id, nome, telefone, email)
       VALUES ($1, $2, $3, $4)
       ON CONFLICT (telefone, clinica_id) DO UPDATE 
       SET nome = EXCLUDED.nome, email = EXCLUDED.email
       RETURNING *;
-    `, [req.clinica_id, nome, telefone, email]);
+    `, [req.clinica_id, nome, cleanTelefone, email]);
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('SERVER ERROR:', error);
@@ -186,11 +198,12 @@ app.post('/api/clientes', validateClinicaHeader, async (req, res) => {
 app.put('/api/clientes/:id', validateClinicaHeader, async (req, res) => {
   const { id } = req.params;
   const { nome, telefone, email } = req.body;
+  const cleanTelefone = telefone.toString().replace(/\D/g, '');
   try {
     const result = await pool.query(`
       UPDATE clientes SET nome = $1, telefone = $2, email = $3
       WHERE id = $4 AND clinica_id = $5 RETURNING *
-    `, [nome, telefone, email, id, req.clinica_id]);
+    `, [nome, cleanTelefone, email, id, req.clinica_id]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'Cliente não encontrado' });
     res.json(result.rows[0]);
   } catch (error) {
